@@ -1,13 +1,13 @@
 {
-  "name": "@opencode-ai/desktop",
+  "name": "@lockedcode/desktop",
   "private": true,
   "version": "1.14.44",
   "type": "module",
   "license": "MIT",
-  "homepage": "https://opencode.ai",
+  "homepage": "https://lockedcode.ai",
   "author": {
-    "name": "OpenCode",
-    "email": "hello@opencode.ai"
+    "name": "LockedCode",
+    "email": "hello@lockedcode.ai"
   },
   "scripts": {
     "typecheck": "tsgo -b",

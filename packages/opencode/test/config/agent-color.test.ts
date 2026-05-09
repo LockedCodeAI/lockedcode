@@ -14,9 +14,9 @@ const it = testEffect(Layer.mergeAll(AgentSvc.defaultLayer, CrossSpawnSpawner.de
 const writeConfig = (dir: string, agent: Config.Info["agent"]) =>
   Effect.promise(() =>
     Bun.write(
-      path.join(dir, "opencode.json"),
+      path.join(dir, "lockedcode.json"),
       JSON.stringify({
-        $schema: "https://opencode.ai/config.json",
+        $schema: "https://lockedcode.ai/config.json",
         agent,
       }),
     ),

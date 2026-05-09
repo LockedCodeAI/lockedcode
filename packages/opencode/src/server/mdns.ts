@@ -11,7 +11,7 @@ export function publish(port: number, domain?: string) {
   if (bonjour) unpublish()
 
   try {
-    const host = domain ?? "opencode.local"
+    const host = domain ?? "lockedcode.local"
     const name = `opencode-${port}`
     bonjour = new Bonjour()
     const service = bonjour.publish({

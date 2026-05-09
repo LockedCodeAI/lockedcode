@@ -13,13 +13,13 @@ import { testEffect } from "../lib/effect"
 const testStateLayer = Layer.effectDiscard(
   Effect.gen(function* () {
     const original = {
-      OPENCODE_SERVER_PASSWORD: Flag.OPENCODE_SERVER_PASSWORD,
+      OPENCODE_SERVER_PASSWORD: Flag.LOCKEDCODE_SERVER_PASSWORD,
     }
-    Flag.OPENCODE_SERVER_PASSWORD = "secret"
+    Flag.LOCKEDCODE_SERVER_PASSWORD = "secret"
     yield* Effect.promise(() => resetDatabase())
     yield* Effect.addFinalizer(() =>
       Effect.promise(async () => {
-        Flag.OPENCODE_SERVER_PASSWORD = original.OPENCODE_SERVER_PASSWORD
+        Flag.LOCKEDCODE_SERVER_PASSWORD = original.OPENCODE_SERVER_PASSWORD
         await resetDatabase()
       }),
     )
@@ -64,21 +64,21 @@ describe("HttpApi CORS", () => {
     Effect.gen(function* () {
       const handler = HttpRouter.toWebHandler(
         ExperimentalHttpApiServer.createRoutes().pipe(
-          Layer.provide(ConfigProvider.layer(ConfigProvider.fromUnknown({ OPENCODE_SERVER_PASSWORD: "secret" }))),
+          Layer.provide(ConfigProvider.layer(ConfigProvider.fromUnknown({ LOCKEDCODE_SERVER_PASSWORD: "secret" }))),
         ),
         { disableLogger: true },
       ).handler
       const response = yield* Effect.promise(() =>
         handler(
           new Request(new URL("/global/config", "http://localhost"), {
-            headers: { origin: "https://app.opencode.ai" },
+            headers: { origin: "https://app.lockedcode.ai" },
           }),
           ExperimentalHttpApiServer.context,
         ),
       )
 
       expect(response.status).toBe(401)
-      expect(response.headers.get("access-control-allow-origin")).toBe("https://app.opencode.ai")
+      expect(response.headers.get("access-control-allow-origin")).toBe("https://app.lockedcode.ai")
     }),
   )
 

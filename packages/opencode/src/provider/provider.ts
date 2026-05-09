@@ -411,9 +411,9 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         autoload: false,
         options: {
           headers: {
-            "HTTP-Referer": "https://opencode.ai/",
-            "X-Title": "opencode",
-            "X-Source": "opencode",
+            "HTTP-Referer": "https://lockedcode.ai/",
+            "X-Title": "lockedcode",
+            "X-Source": "lockedcode",
           },
         },
       }),
@@ -422,8 +422,8 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         autoload: false,
         options: {
           headers: {
-            "HTTP-Referer": "https://opencode.ai/",
-            "X-Title": "opencode",
+            "HTTP-Referer": "https://lockedcode.ai/",
+            "X-Title": "lockedcode",
           },
         },
       }),
@@ -432,8 +432,8 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         autoload: false,
         options: {
           headers: {
-            "HTTP-Referer": "https://opencode.ai/",
-            "X-Title": "opencode",
+            "HTTP-Referer": "https://lockedcode.ai/",
+            "X-Title": "lockedcode",
           },
         },
       }),
@@ -442,8 +442,8 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         autoload: false,
         options: {
           headers: {
-            "http-referer": "https://opencode.ai/",
-            "x-title": "opencode",
+            "http-referer": "https://lockedcode.ai/",
+            "x-title": "lockedcode",
           },
         },
       }),
@@ -540,8 +540,8 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         autoload: false,
         options: {
           headers: {
-            "HTTP-Referer": "https://opencode.ai/",
-            "X-Title": "opencode",
+            "HTTP-Referer": "https://lockedcode.ai/",
+            "X-Title": "lockedcode",
           },
         },
       }),
@@ -816,7 +816,7 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         autoload: false,
         options: {
           headers: {
-            "X-Cerebras-3rd-Party-Integration": "opencode",
+            "X-Cerebras-3rd-Party-Integration": "lockedcode",
           },
         },
       }),
@@ -825,8 +825,8 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         autoload: false,
         options: {
           headers: {
-            "HTTP-Referer": "https://opencode.ai/",
-            "X-Title": "opencode",
+            "HTTP-Referer": "https://lockedcode.ai/",
+            "X-Title": "lockedcode",
           },
         },
       }),

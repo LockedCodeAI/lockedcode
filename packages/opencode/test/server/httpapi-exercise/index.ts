@@ -473,7 +473,7 @@ const scenarios: Scenario[] = [
   http.protected
     .get("/experimental/tool", "tool.list")
     .at((ctx) => ({
-      path: `/experimental/tool?${new URLSearchParams({ provider: "opencode", model: "test" })}`,
+      path: `/experimental/tool?${new URLSearchParams({ provider: "lockedcode", model: "test" })}`,
       headers: ctx.headers(),
     }))
     .json(200, array, "status"),

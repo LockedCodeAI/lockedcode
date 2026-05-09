@@ -81,15 +81,15 @@ export async function tmpdir<T>(options?: TmpDirOptions<T>) {
     await $`git init`.cwd(dirpath).quiet()
     await $`git config core.fsmonitor false`.cwd(dirpath).quiet()
     await $`git config commit.gpgsign false`.cwd(dirpath).quiet()
-    await $`git config user.email "test@opencode.test"`.cwd(dirpath).quiet()
+      await $`git config user.email "test@lockedcode.test"`.cwd(dirpath).quiet()
     await $`git config user.name "Test"`.cwd(dirpath).quiet()
     await $`git commit --allow-empty -m "root commit ${dirpath}"`.cwd(dirpath).quiet()
   }
   if (options?.config) {
     await Bun.write(
-      path.join(dirpath, "opencode.json"),
+      path.join(dirpath, "lockedcode.json"),
       JSON.stringify({
-        $schema: "https://opencode.ai/config.json",
+        $schema: "https://lockedcode.ai/config.json",
         ...options.config,
       }),
     )
@@ -133,7 +133,7 @@ export function tmpdirScoped(options?: { git?: boolean; config?: Partial<Config.
       yield* git("init")
       yield* git("config", "core.fsmonitor", "false")
       yield* git("config", "commit.gpgsign", "false")
-      yield* git("config", "user.email", "test@opencode.test")
+      yield* git("config", "user.email", "test@lockedcode.test")
       yield* git("config", "user.name", "Test")
       yield* git("commit", "--allow-empty", "-m", "root commit")
     }
@@ -141,8 +141,8 @@ export function tmpdirScoped(options?: { git?: boolean; config?: Partial<Config.
     if (options?.config) {
       yield* Effect.promise(() =>
         fs.writeFile(
-          path.join(dir, "opencode.json"),
-          JSON.stringify({ $schema: "https://opencode.ai/config.json", ...options.config }),
+          path.join(dir, "lockedcode.json"),
+          JSON.stringify({ $schema: "https://lockedcode.ai/config.json", ...options.config }),
         ),
       )
     }

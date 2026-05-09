@@ -23,18 +23,18 @@ void Log.init({ print: false })
 
 const original = {
   OPENCODE_DISABLE_EMBEDDED_WEB_UI: Flag.OPENCODE_DISABLE_EMBEDDED_WEB_UI,
-  OPENCODE_SERVER_PASSWORD: Flag.OPENCODE_SERVER_PASSWORD,
-  OPENCODE_SERVER_USERNAME: Flag.OPENCODE_SERVER_USERNAME,
-  envPassword: process.env.OPENCODE_SERVER_PASSWORD,
-  envUsername: process.env.OPENCODE_SERVER_USERNAME,
+  LOCKEDCODE_SERVER_PASSWORD: Flag.LOCKEDCODE_SERVER_PASSWORD,
+  LOCKEDCODE_SERVER_USERNAME: Flag.LOCKEDCODE_SERVER_USERNAME,
+  envPassword: process.env.LOCKEDCODE_SERVER_PASSWORD,
+  envUsername: process.env.LOCKEDCODE_SERVER_USERNAME,
 }
 
 afterEach(() => {
   Flag.OPENCODE_DISABLE_EMBEDDED_WEB_UI = original.OPENCODE_DISABLE_EMBEDDED_WEB_UI
-  Flag.OPENCODE_SERVER_PASSWORD = original.OPENCODE_SERVER_PASSWORD
-  Flag.OPENCODE_SERVER_USERNAME = original.OPENCODE_SERVER_USERNAME
-  restoreEnv("OPENCODE_SERVER_PASSWORD", original.envPassword)
-  restoreEnv("OPENCODE_SERVER_USERNAME", original.envUsername)
+  Flag.LOCKEDCODE_SERVER_PASSWORD = original.LOCKEDCODE_SERVER_PASSWORD
+  Flag.LOCKEDCODE_SERVER_USERNAME = original.LOCKEDCODE_SERVER_USERNAME
+  restoreEnv("LOCKEDCODE_SERVER_PASSWORD", original.envPassword)
+  restoreEnv("LOCKEDCODE_SERVER_USERNAME", original.envUsername)
 })
 
 function restoreEnv(key: string, value: string | undefined) {
@@ -51,8 +51,8 @@ function app(input?: { password?: string; username?: string }) {
       Layer.provide(
         ConfigProvider.layer(
           ConfigProvider.fromUnknown({
-            OPENCODE_SERVER_PASSWORD: input?.password,
-            OPENCODE_SERVER_USERNAME: input?.username,
+            LOCKEDCODE_SERVER_PASSWORD: input?.password,
+            LOCKEDCODE_SERVER_USERNAME: input?.username,
           }),
         ),
       ),
@@ -85,8 +85,8 @@ function uiApp(input?: { password?: string; username?: string; client?: Layer.La
         HttpServer.layerServices,
         ConfigProvider.layer(
           ConfigProvider.fromUnknown({
-            OPENCODE_SERVER_PASSWORD: input?.password,
-            OPENCODE_SERVER_USERNAME: input?.username,
+            LOCKEDCODE_SERVER_PASSWORD: input?.password,
+            LOCKEDCODE_SERVER_USERNAME: input?.username,
           }),
         ),
       ]),
@@ -120,7 +120,7 @@ describe("HttpApi UI fallback", () => {
 
     const response = await uiApp({
       client: httpClient(
-        new Response("<html>opencode</html>", { headers: { "content-type": "text/html" } }),
+        new Response("<html>lockedcode</html>", { headers: { "content-type": "text/html" } }),
         (request) => {
           proxiedUrl = request.url
         },
@@ -129,8 +129,8 @@ describe("HttpApi UI fallback", () => {
 
     expect(response.status).toBe(200)
     expect(response.headers.get("content-type")).toContain("text/html")
-    expect(await response.text()).toBe("<html>opencode</html>")
-    expect(proxiedUrl).toBe("https://app.opencode.ai/")
+    expect(await response.text()).toBe("<html>lockedcode</html>")
+    expect(proxiedUrl).toBe("https://app.lockedcode.ai/")
   })
 
   test("strips upstream transfer encoding headers from proxied assets", async () => {
@@ -174,7 +174,7 @@ describe("HttpApi UI fallback", () => {
     )
 
     expect(response.status).toBe(200)
-    expect(proxiedUrl).toBe("https://app.opencode.ai/assets/app.js")
+    expect(proxiedUrl).toBe("https://app.lockedcode.ai/assets/app.js")
     expect(response.headers.get("content-encoding")).toBeNull()
     expect(response.headers.get("content-length")).not.toBe("999")
     expect(response.headers.get("content-type")).toContain("text/javascript")
@@ -205,7 +205,7 @@ describe("HttpApi UI fallback", () => {
                 Effect.succeed(
                   HttpClientResponse.fromWeb(
                     request,
-                    new Response("<html>opencode</html>", {
+                    new Response("<html>lockedcode</html>", {
                       headers: {
                         "transfer-encoding": "chunked",
                         "content-type": "text/html",
@@ -223,7 +223,7 @@ describe("HttpApi UI fallback", () => {
 
     expect(response.status).toBe(200)
     expect(response.headers.get("transfer-encoding")).toBeNull()
-    expect(await response.text()).toBe("<html>opencode</html>")
+    expect(await response.text()).toBe("<html>lockedcode</html>")
   })
 
   test("serves embedded UI assets when Bun can read them but access reports missing", async () => {
@@ -295,7 +295,7 @@ describe("HttpApi UI fallback", () => {
   test("requires server password for the web UI", async () => {
     Flag.OPENCODE_DISABLE_EMBEDDED_WEB_UI = true
 
-    const response = await uiApp({ password: "secret", username: "opencode" }).request("/")
+    const response = await uiApp({ password: "secret", username: "lockedcode" }).request("/")
 
     expect(response.status).toBe(401)
     expect(response.headers.get("www-authenticate")).toBe('Basic realm="Secure Area"')
@@ -306,19 +306,19 @@ describe("HttpApi UI fallback", () => {
 
     const response = await uiApp({
       password: "secret",
-      username: "opencode",
-      client: httpClient(new Response("<html>opencode</html>", { headers: { "content-type": "text/html" } })),
-    }).request(`/?auth_token=${btoa("opencode:secret")}`)
+      username: "lockedcode",
+      client: httpClient(new Response("<html>lockedcode</html>", { headers: { "content-type": "text/html" } })),
+    }).request(`/?auth_token=${btoa("lockedcode:secret")}`)
 
     expect(response.status).toBe(200)
-    expect(await response.text()).toBe("<html>opencode</html>")
+    expect(await response.text()).toBe("<html>lockedcode</html>")
   })
 
   test("accepts basic auth for the web UI", async () => {
     Flag.OPENCODE_DISABLE_EMBEDDED_WEB_UI = true
 
-    const response = await uiApp({ password: "secret", username: "opencode" }).request("/", {
-      headers: { authorization: `Basic ${btoa("opencode:secret")}` },
+    const response = await uiApp({ password: "secret", username: "lockedcode" }).request("/", {
+      headers: { authorization: `Basic ${btoa("lockedcode:secret")}` },
     })
 
     expect(response.status).toBe(200)
@@ -335,7 +335,7 @@ describe("HttpApi UI fallback", () => {
     for (const path of ["/site.webmanifest", "/web-app-manifest-192x192.png", "/web-app-manifest-512x512.png"]) {
       const response = await uiApp({
         password: "secret",
-        username: "opencode",
+        username: "lockedcode",
         client: httpClient(new Response("ok")),
       }).request(path)
       expect(response.status).not.toBe(401)
@@ -343,7 +343,7 @@ describe("HttpApi UI fallback", () => {
   })
 
   test("allows web UI preflight without auth", async () => {
-    const response = await app({ password: "secret", username: "opencode" }).request("/", {
+    const response = await app({ password: "secret", username: "lockedcode" }).request("/", {
       method: "OPTIONS",
       headers: {
         origin: "http://localhost:3000",

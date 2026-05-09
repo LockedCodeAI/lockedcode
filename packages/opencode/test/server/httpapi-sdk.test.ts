@@ -22,8 +22,8 @@ import { disposeAllInstances, tmpdir } from "../fixture/fixture"
 import { it } from "../lib/effect"
 
 const original = {
-  OPENCODE_SERVER_PASSWORD: Flag.OPENCODE_SERVER_PASSWORD,
-  OPENCODE_SERVER_USERNAME: Flag.OPENCODE_SERVER_USERNAME,
+  OPENCODE_SERVER_PASSWORD: Flag.LOCKEDCODE_SERVER_PASSWORD,
+  OPENCODE_SERVER_USERNAME: Flag.LOCKEDCODE_SERVER_USERNAME,
 }
 
 type ServerPath = "default" | "raw"
@@ -34,8 +34,8 @@ type ProjectFixture = { sdk: Sdk; directory: string }
 type LlmProjectFixture = ProjectFixture & { llm: TestLLMServer["Service"] }
 
 function app(serverPath: ServerPath, input?: { password?: string; username?: string }) {
-  Flag.OPENCODE_SERVER_PASSWORD = input?.password
-  Flag.OPENCODE_SERVER_USERNAME = input?.username
+  Flag.LOCKEDCODE_SERVER_PASSWORD = input?.password
+  Flag.LOCKEDCODE_SERVER_USERNAME = input?.username
   if (serverPath === "default") return Server.Default().app
 
   const handler = HttpRouter.toWebHandler(
@@ -304,8 +304,8 @@ function seedMessage(directory: string, sessionID: string) {
 }
 
 afterEach(async () => {
-  Flag.OPENCODE_SERVER_PASSWORD = original.OPENCODE_SERVER_PASSWORD
-  Flag.OPENCODE_SERVER_USERNAME = original.OPENCODE_SERVER_USERNAME
+  Flag.LOCKEDCODE_SERVER_PASSWORD = original.OPENCODE_SERVER_PASSWORD
+  Flag.LOCKEDCODE_SERVER_USERNAME = original.OPENCODE_SERVER_USERNAME
   await disposeAllInstances()
   await resetDatabase()
 })

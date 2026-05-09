@@ -69,7 +69,7 @@ Add to your Zed configuration (`~/.config/zed/settings.json`):
 ```json
 {
   "agent_servers": {
-    "OpenCode": {
+    "LockedCode": {
       "command": "opencode",
       "args": ["acp"]
     }
