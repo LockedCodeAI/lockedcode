@@ -1,0 +1,354 @@
+---
+layout: default
+title: LockedCode
+---
+<p align="center">
+  <a href="https://lockedcode.ai">
+    <picture>
+      <source srcset="packages/console/app/src/asset/logo-ornate-dark.svg" media="(prefers-color-scheme: dark)">
+      <source srcset="packages/console/app/src/asset/logo-ornate-light.svg" media="(prefers-color-scheme: light)">
+      <img src="packages/console/app/src/asset/logo-ornate-light.svg" alt="LockedCode logo">
+    </picture>
+  </a>
+</p>
+<p align="center"><strong>Secure Agentic Coding.</strong></p>
+<p align="center"><em>AI writes the code. LockedCode makes sure that's all it does.</em></p>
+
+---
+
+## What Is LockedCode?
+
+LockedCode is a security-hardened fork of [OpenCode](https://github.com/anomalyco/opencode), the open-source AI coding agent with over 150,000 GitHub stars and 6.5 million monthly users. OpenCode lets LLMs read files, write code, run shell commands, and autonomously build projects in your workspace. It's fast, flexible, and provider-agnostic.
+
+It's also entirely trust-based. The LLM proposes an action, the developer gets a confirmation prompt, and the action executes. There are no hard boundaries on what the agent can access, no scanning of what it produces, no audit trail of what it did, and no protection against what it sends to the model provider. For solo developers using frontier models from trusted providers, that's fine.
+
+For corporate development teams — especially those using open-source, self-hosted, or offline models to manage token costs — it's a non-starter.
+
+**LockedCode fixes this.** It adds a comprehensive security layer between the LLM's intent and the agent's execution. Every file write passes through static scanning. Every shell command is parsed and analyzed. Every outbound context payload is checked for secrets and PII. Every action is confined to the project directory at the operating system level. Everything is logged in an immutable audit trail. And every security decision is configurable via declarative policy.
+
+LockedCode is not a wrapper around OpenCode. It *is* OpenCode — every feature, every provider integration, every TUI capability — with a security layer that makes it safe for real codebases, real teams, and real compliance requirements.
+
+---
+
+## Why Does This Exist?
+
+The AI coding agent market is moving fast. Enterprises are under pressure from two directions: leadership wants AI-accelerated development, and finance wants to control the token spend that comes with routing everything through frontier model APIs. The obvious solution is running smaller, cheaper, or self-hosted models — Llama, Qwen, Mistral, DeepSeek, CodeGemma, local fine-tunes.
+
+But the moment you step outside the frontier providers, you lose whatever implicit trust came with that relationship. Nobody at Anthropic or OpenAI is deliberately shipping a model that exfiltrates your source code. Can you say the same about a fine-tuned model someone uploaded to Hugging Face last week? Or a quantized variant running on an internal GPU cluster that was trained on data nobody fully audited?
+
+This is the gap LockedCode fills. It treats every LLM output as potentially adversarial — regardless of the model's provenance, reputation, or provider — and enforces security at every layer:
+
+- **What the model writes** is scanned for malware patterns, encoded payloads, obfuscated network calls, credential theft, and crypto mining before it touches the filesystem.
+- **What the model executes** is parsed, analyzed, and validated against the project boundary before any shell command runs.
+- **What the model sees** is scanned for secrets, PII, and sensitive file content before it leaves the machine.
+- **What the model reads** is checked for prompt injection attacks designed to manipulate the agent's behavior.
+- **Where the model can reach** is confined to the project directory at the kernel level — no amount of clever LLM output gets past a Landlock jail.
+- **Everything that happens** is recorded in an immutable, content-hashed audit trail that satisfies compliance frameworks.
+
+---
+
+## Who Is This For?
+
+**Corporate development teams using non-frontier models.** You've chosen to run Llama, Qwen, Mistral, or a self-hosted fine-tune to manage costs or keep code on-premises. LockedCode makes that decision safe.
+
+**Security-conscious organizations.** Your CISO or security team has blocked AI coding agents because there's no way to verify what the agent produces or prevent it from accessing resources outside the project. LockedCode is what lets them say yes.
+
+**Regulated industries.** Finance, healthcare, government, defense — environments where AI-generated code must have a provable audit trail and where compliance frameworks require evidence of controls around automated code generation.
+
+**Air-gapped environments.** You're running local models on local hardware behind firewalls with no internet access. LockedCode works fully offline with zero cloud dependencies.
+
+**Anyone who takes supply-chain security seriously.** If you wouldn't run an unaudited third-party script against your production codebase, you shouldn't run an unverified LLM agent against it either.
+
+---
+
+## Feature Overview
+
+### Directory Confinement (Project-Root Jail)
+
+The foundational security feature. Every file operation the agent performs is confined to the project directory tree by default, enforced at the operating system level — not just application-level path checks.
+
+- **Linux:** Landlock LSM (kernel 5.13+) provides kernel-enforced filesystem confinement with no root required. Bubblewrap (bwrap) serves as a fallback for older kernels.
+- **Windows:** Restricted tokens with low integrity level, NTFS ACLs scoped to the project directory, and job objects to contain the entire process tree.
+- **macOS:** Process-level sandbox profiles with FSEvents monitoring as a detection backstop.
+- **Path canonicalization:** Aggressive normalization defeats symlinks, relative paths, hardlinks, junction points, short names, and mount traversal — on every platform.
+- **Escape hatch:** Legitimate outside access (package managers, Docker, build tools) goes through a controlled approval flow. The developer sees exactly what's being requested, explicitly approves, and the action is logged with a content hash and justification.
+- **Process tree inheritance:** Child processes spawned by shell commands inherit confinement. The jail applies to the entire execution tree, not just the top-level agent.
+
+### Static Scanning Pipeline
+
+Every piece of code the LLM proposes to write or modify is scanned before it touches the filesystem.
+
+- **Semgrep integration** with custom rulesets specifically tuned for LLM failure modes — not generic SAST rules, but patterns that LLMs specifically tend to produce: encoded payloads (base64, hex, rot13), dynamic code execution (eval, Function, exec), obfuscated network calls, crypto mining patterns, C2 beacon patterns, data exfiltration via environment variable reads piped to HTTP calls, and suspicious writes to startup directories or cron jobs.
+- **YARA signature scanning** for known malicious code patterns — reverse shells, web shells, credential stealers, cryptocurrency miners, and common LLM-generated malware signatures.
+- **Entropy analysis** catches obfuscated payloads that evade pattern matching by detecting suspiciously high-entropy strings in source code contexts.
+- **Scan timing:** Scans fire before every file write and every file edit. The proposed content is analyzed before it's written to disk — malicious code never touches the filesystem.
+
+### Shell Command Interception
+
+Every shell command the agent proposes is structurally parsed and analyzed before execution.
+
+- **Structural command parsing** — not string matching, but actual parse of pipes, redirects, subshells, backgrounding, and command substitution to understand what a command really does.
+- **Hard-blocked patterns** that are never legitimate in an agentic coding context: `curl | bash` (and variants), system startup modification (crontab, systemctl enable, launchctl load), SSH config and authorized_keys modification, shell profile writes, and raw network listeners.
+- **Path extraction and validation** — every file path referenced in a command is extracted and validated against the confinement boundary.
+- **Environment variable protection** — commands that read or export known sensitive environment variables (API keys, tokens, credentials) are flagged.
+- **Risk scoring** — every command gets a trust score that drives the approval UX.
+
+### Data Loss Prevention (Outbound DLP)
+
+Protects what goes TO the model, not just what comes FROM it. Prevents the agent from sending sensitive codebase content to the LLM provider.
+
+- **Secret scanning on outbound context** — before files are sent to the LLM as context, they're scanned for API keys, tokens, private keys, database connection strings, and other credential patterns across 50+ formats.
+- **PII detection** — pattern-based detection of email addresses, phone numbers, SSNs, credit card numbers, and other personally identifiable information in files being sent to the model.
+- **File-level sensitivity policy** — configurable glob patterns for files that should never be sent to the LLM (`.env`, `credentials.json`, `*.key`, production config directories).
+- **Redaction mode** — option to redact detected secrets and PII from outbound context rather than blocking the entire file. The model sees the code structure with sensitive values replaced by typed placeholders.
+
+### Prompt Injection Detection
+
+Scans files being ingested as context for embedded instructions designed to manipulate the LLM.
+
+- **Injection pattern detection** — role-override attempts, system prompt markers in file content, instructions hidden in comments, Unicode manipulation (invisible characters, bidirectional overrides, homoglyphs), encoded instructions in comments or metadata.
+- **Dependency metadata scanning** — package manifests, README files, and metadata from third-party dependencies are scanned before the model sees them.
+- **Configurable sensitivity** — low for trusted internal codebases, high for third-party and open-source code.
+
+### Secret Detection in Generated Code
+
+LLMs sometimes hallucinate realistic-looking credentials or reproduce real secrets from their training data.
+
+- **Pre-write scanning** for 50+ credential formats — AWS keys, GitHub PATs, Slack tokens, database URIs with passwords, JWTs, private key headers, and generic high-entropy strings in assignment contexts.
+- **Context-aware** — distinguishes between actual secrets and test fixtures or documentation examples.
+- **Git-aware** — secrets are caught before the file is written to disk. They never enter the Git history.
+
+### Audit Trail
+
+Every action the agent takes, every scan result, every approval decision — logged with content hashes and timestamps.
+
+- **Append-only log** — immutable audit records that cannot be modified or deleted through the agent.
+- **Content hashing** — every entry includes a SHA-256 hash of the content involved (file contents before and after, command text, scan results) for tamper evidence.
+- **Structured format** — JSON-structured entries with a consistent schema, queryable and parseable by external tools.
+- **Session correlation** — every entry is tied to a session, a model, and a tool invocation for full traceability from "the model said X" to "this is what actually happened."
+- **Local storage** — SQLite database, no cloud dependencies. Configurable retention period.
+
+### Policy Engine
+
+Declarative, configurable security rules that drive every security decision.
+
+- **YAML configuration** at the project root (`lockedcode.yaml`) with optional global defaults.
+- **Policy hierarchy** — global defaults → organization policy → project policy → session overrides. More specific policies override less specific ones.
+- **Rule categories** — path rules, command rules, network rules, dependency rules, model rules, sensitivity classifications.
+- **Three strictness levels:**
+  - `strict` — everything not explicitly allowed is denied.
+  - `standard` — default rules enforced, escape hatch available for unlisted actions.
+  - `permissive` — scan and log everything, block only hard-blocked patterns, prompt on high-risk actions.
+- **Sensible defaults** — the tool works out of the box without a policy file. The defaults provide `standard` strictness with bundled scanner rules.
+
+### Trust Scoring
+
+Risk assessment for every LLM interaction, driving the approval UX.
+
+- **Per-action risk scores** based on what the action does — file renames score low, `curl | bash` scores critical.
+- **Score-driven UX** — low-risk actions auto-approve, medium-risk actions notify, high-risk actions require explicit approval, critical-risk actions are hard-blocked.
+- **Session trust decay** — if a model repeatedly proposes high-risk actions, the session's baseline trust decreases and more actions require approval.
+- **Model trust history** — persistent per-model trust metrics. Models that frequently trigger flags are surfaced to the developer.
+
+### Multi-Agent Security Cascade
+
+OpenCode has sub-agents (build, plan, general, task). LockedCode ensures security policies cascade to all of them.
+
+- **Policy inheritance** — child agents inherit the parent's security policy, confinement boundary, and audit context.
+- **No privilege escalation** — a sub-agent can never have more permissive security settings than its parent.
+- **Audit trail linkage** — sub-agent actions are logged under the parent session's audit trail with explicit parent-child relationship markers.
+
+### Air-Gap Mode
+
+Full functionality with zero internet access. No cloud dependencies, no update checks, no telemetry, no phone-home.
+
+- **Bundled rule sets** — Semgrep rules, YARA signatures, secret detection patterns, and prompt injection patterns ship with the distribution. No download-on-first-run.
+- **Zero runtime network dependencies** — audit trail, policy engine, trust scoring, and all security checks function entirely offline.
+- **Offline updates** — rule set updates are distributed as versioned offline packages that the developer manually installs.
+
+---
+
+## V2 Roadmap
+
+These features are planned for V2 and are not yet implemented:
+
+- **Runtime Monitoring** — eBPF-based syscall monitoring, process tree analysis, and network activity detection for defense-in-depth beyond static scanning.
+- **Model Provenance Tracking** — per-file, per-line attribution of which model generated the code, with the ability to query "show me everything Model X generated."
+- **Model Registry and Approval Workflow** — centralized control over which models developers can connect to, with organization-level approved model lists.
+- **Dependency Vetting** — typosquatting detection, known vulnerability checking, and approved package registry enforcement when the LLM adds dependencies.
+- **SIEM Integration** — structured event export to Splunk, Datadog, Elastic, and generic syslog endpoints in CEF, OCSF, and JSON formats.
+- **Compliance Report Generation** — automated evidence generation mapping to SOC2, ISO 27001, HIPAA, and FedRAMP control frameworks.
+- **License Contamination Detection** — code fingerprinting against known open-source code bodies to flag potential license contamination in generated code.
+- **Session Recording and Replay** — full session replay for incident investigation with a visual timeline interface.
+- **Custom Rule Authoring** — SDK/DSL for security teams to write organization-specific scanning rules with a testing framework.
+- **Rollback and Quarantine** — automated response when a security issue is detected after code is written, including quarantine to a holding branch.
+
+---
+
+## Installation
+
+```bash
+# npm (recommended)
+npm i -g lockedcode@latest
+
+# Homebrew (macOS and Linux)
+brew install LockedCodeAI/tap/lockedcode
+
+# Scoop (Windows)
+scoop install lockedcode
+
+# Direct binary
+# Download from https://github.com/LockedCodeAI/lockedcode/releases
+```
+
+### Desktop App
+
+LockedCode is also available as a desktop application. Download directly from the [releases page](https://github.com/LockedCodeAI/lockedcode/releases) or [lockedcode.ai/download](https://lockedcode.ai/download).
+
+| Platform              | Download                              |
+| --------------------- | ------------------------------------- |
+| macOS (Apple Silicon) | `lockedcode-desktop-mac-arm64.dmg`    |
+| macOS (Intel)         | `lockedcode-desktop-mac-x64.dmg`      |
+| Windows               | `lockedcode-desktop-windows-x64.exe`  |
+| Linux                 | `.deb`, `.rpm`, or `.AppImage`        |
+
+```bash
+# macOS (Homebrew)
+brew install --cask lockedcode-desktop
+# Windows (Scoop)
+scoop bucket add extras; scoop install extras/lockedcode-desktop
+```
+
+### Installation Directory
+
+The install script respects the following priority order for the installation path:
+
+1. `$LOCKEDCODE_INSTALL_DIR` - Custom installation directory
+2. `$XDG_BIN_DIR` - XDG Base Directory Specification compliant path
+3. `$HOME/bin` - Standard user binary directory (if it exists or can be created)
+4. `$HOME/.lockedcode/bin` - Default fallback
+
+```bash
+# Examples
+LOCKEDCODE_INSTALL_DIR=/usr/local/bin curl -fsSL https://lockedcode.ai/install | bash
+XDG_BIN_DIR=$HOME/.local/bin curl -fsSL https://lockedcode.ai/install | bash
+```
+
+### Post-Install: Security Capability Check
+
+After installation, run:
+
+```bash
+lockedcode --security-check
+```
+
+This reports the security capabilities available on your platform:
+
+- Confinement backend (Landlock, Bubblewrap, sandbox-exec, restricted tokens)
+- Scanner availability (Semgrep, YARA)
+- Policy file detection
+- Air-gap mode status
+
+---
+
+## Quick Start: Security Configuration
+
+LockedCode works out of the box with sensible defaults (standard strictness, bundled scanner rules, automatic project root detection). For custom configuration, create a `lockedcode.yaml` at your project root:
+
+```yaml
+security:
+  strictness: standard          # strict | standard | permissive
+
+  confinement:
+    pre_approved_paths:
+      - ~/.npm                  # npm cache
+      - ~/.bun                  # bun cache
+      - /tmp                    # temp directory
+
+  scanning:
+    semgrep: true
+    yara: true
+    entropy: true
+    secrets: true
+
+  dlp:
+    redaction_mode: true        # redact secrets instead of blocking files
+    sensitivity_patterns:
+      - "**/.env*"
+      - "**/credentials.*"
+      - "**/config/production/**"
+
+  trust:
+    auto_approve_below: 20      # auto-approve low-risk actions
+    prompt_above: 50            # require approval for medium+ risk
+    block_above: 90             # hard-block critical risk
+
+  audit:
+    retention_days: 90
+```
+
+---
+
+## Agents
+
+LockedCode includes the same built-in agents as OpenCode, with security policies applied to all of them:
+
+- **build** - Default, full-access agent for development work. All actions pass through the security layer.
+- **plan** - Read-only agent for analysis and code exploration. Denies file edits by default. Asks permission before running bash commands. Security scanning still applies to any approved operations.
+
+Also included is a **general** subagent for complex searches and multistep tasks. This is used internally and can be invoked using `@general` in messages. Security policies cascade to all subagents with no privilege escalation.
+
+---
+
+## Relationship to OpenCode
+
+LockedCode is a fork of [OpenCode](https://github.com/anomalyco/opencode) (MIT License). It tracks upstream OpenCode development and selectively merges new features and fixes. All original OpenCode capabilities — provider integrations, TUI, LSP support, MCP, client/server architecture, plugin system — are fully preserved.
+
+The fork diverges in one dimension: LockedCode adds a security layer that OpenCode's maintainers are unlikely to add as a core feature, because deep security confinement adds friction by design, which works against OpenCode's optimization for speed and flexibility.
+
+LockedCode is for organizations and developers who need that friction — who need verifiable evidence that the agent can't do anything it wasn't supposed to.
+
+### How is this different from OpenCode?
+
+Everything OpenCode does, plus:
+
+- OS-level directory confinement (Landlock, sandbox-exec, restricted tokens)
+- Static scanning of all LLM-generated code before it touches the filesystem
+- Shell command parsing and analysis before execution
+- Outbound DLP preventing secrets and PII from reaching the model
+- Prompt injection detection on ingested files
+- Secret detection in generated code
+- Immutable, content-hashed audit trail
+- Declarative policy engine with configurable strictness
+- Trust scoring with score-driven approval UX
+- Multi-agent security cascade
+- Full air-gap mode with bundled rule sets
+
+### How is this different from Claude Code?
+
+Everything that differentiates OpenCode from Claude Code, plus the full security layer above:
+
+- 100% open source
+- Not coupled to any provider. LockedCode can be used with Claude, OpenAI, Google, or even local models.
+- Security layer that treats every model as potentially adversarial — including frontier models
+- Built-in opt-in LSP support
+- A focus on TUI, built by neovim users and the creators of [terminal.shop](https://terminal.shop)
+- A client/server architecture allowing remote operation from a mobile app
+
+---
+
+## Documentation
+
+For more info on how to configure LockedCode, including detailed security configuration, policy authoring, and platform-specific confinement setup, [**head over to our docs**](https://lockedcode.ai/docs).
+
+## Contributing
+
+If you're interested in contributing to LockedCode, please read our [contributing docs](./CONTRIBUTING.md) before submitting a pull request. Security-related contributions — new scanner rules, confinement improvements, and audit trail enhancements — are especially welcome.
+
+## License
+
+LockedCode is licensed under the [MIT License](./LICENSE). It includes attribution to the original OpenCode project by anomalyco.
+
+---
+
+**Learn more** [lockedcode.ai](https://lockedcode.ai) | [GitHub](https://github.com/LockedCodeAI/lockedcode)
