@@ -50,6 +50,7 @@ import { Agent } from "../agent/agent"
 import { Git } from "@/git"
 import { Skill } from "../skill"
 import { Permission } from "@/permission"
+import { Security } from "@/security"
 
 const log = Log.create({ service: "tool.registry" })
 
@@ -83,6 +84,7 @@ export const layer: Layer.Layer<
   Service,
   never,
   | Config.Service
+  | Security.Service
   | Plugin.Service
   | Question.Service
   | Todo.Service
@@ -108,6 +110,7 @@ export const layer: Layer.Layer<
     const agents = yield* Agent.Service
     const skill = yield* Skill.Service
     const truncate = yield* Truncate.Service
+    const security = yield* Security.Service
 
     const invalid = yield* InvalidTool
     const task = yield* TaskTool
@@ -323,6 +326,40 @@ export const layer: Layer.Layer<
             parameters: tool.parameters,
           }
           yield* plugin.trigger("tool.definition", { toolID: tool.id }, output)
+
+          // Wrap tool execution with SecurityService interception.
+          // All checks are pass-through in the skeleton — no blocking.
+          const originalExecute = tool.execute
+          const securedExecute: typeof tool.execute = (args, ctx) =>
+            Effect.gen(function* () {
+              yield* security.evaluatePolicy(tool.id, {
+                sessionID: ctx.sessionID,
+                messageID: ctx.messageID,
+                agent: ctx.agent,
+              })
+              if (tool.id === "write" || tool.id === "edit" || tool.id === "patch") {
+                const content = typeof args === "object" && args !== null ? JSON.stringify(args) : String(args)
+                yield* security.scanContent(content, { sessionID: ctx.sessionID, toolCallID: ctx.callID })
+              }
+              if (tool.id === "shell") {
+                const command = typeof args === "object" && args !== null
+                  ? String((args as Record<string, unknown>).command ?? "")
+                  : String(args)
+                yield* security.scanCommand(command, { sessionID: ctx.sessionID, toolCallID: ctx.callID })
+              }
+              const result = yield* originalExecute(args, ctx)
+              yield* security.recordAuditEvent({
+                eventType: "security.action_approved",
+                sessionId: ctx.sessionID,
+                timestamp: Date.now(),
+                toolName: tool.id,
+                modelId: ctx.agent,
+                actionTaken: "allowed",
+                details: { title: result.title },
+              })
+              return result
+            }).pipe(Effect.orDie)
+
           return {
             id: tool.id,
             description: [
@@ -333,7 +370,7 @@ export const layer: Layer.Layer<
               .filter(Boolean)
               .join("\n"),
             parameters: output.parameters,
-            execute: tool.execute,
+            execute: securedExecute,
             formatValidationError: tool.formatValidationError,
           }
         }),
@@ -364,6 +401,7 @@ export const defaultLayer = Layer.suspend(() =>
     Layer.provide(LSP.defaultLayer),
     Layer.provide(Instruction.defaultLayer),
     Layer.provide(AppFileSystem.defaultLayer),
+    Layer.provide(Security.defaultLayer),
     Layer.provide(Bus.layer),
     Layer.provide(FetchHttpClient.layer),
     Layer.provide(Format.defaultLayer),
