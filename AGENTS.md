@@ -1,103 +1,72 @@
-- To regenerate the JavaScript SDK, run `./packages/sdk/js/script/build.ts`.
-- ALWAYS USE PARALLEL TOOLS WHEN APPLICABLE.
-- The default branch in this repo is `dev`.
-- Local `main` ref may not exist; use `dev` or `origin/dev` for diffs.
-- Prefer automation: execute requested actions without confirmation unless blocked by missing info or safety/irreversibility.
+- **Repo identity:** LockedCode — security-hardened fork of OpenCode (anomalyco/opencode). This is a single monorepo. The core agent is in packages/opencode/. It depends on upstream OpenCode for the base agent functionality; LockedCode additions are in packages/opencode/src/security/.
 
-## Style Guide
+- **Source-of-truth files the agent MUST read first (every session):**
+  1. `CONVENTIONS.md` at repo root — Binding engineering conventions. Your output must follow them exactly.
+  2. `LockedCode-Architecture.md` at repo root — Canonical architecture specification. Defines the security layer design, service boundaries, module structure, and integration points.
 
-### General Principles
+- **Build/test/run commands:**
+  - Build: `bun run script/build.ts` from `packages/opencode`
+  - Test: `bun test --timeout 30000` from `packages/opencode`
+  - Typecheck: `bun turbo typecheck` from repo root (or `tsgo --noEmit` from `packages/opencode`)
+  - Lint: `oxlint` from repo root
 
-- Keep things in one function unless composable or reusable
-- Avoid `try`/`catch` where possible
-- Avoid using the `any` type
-- Use Bun APIs when possible, like `Bun.file()`
-- Rely on type inference when possible; avoid explicit type annotations or interfaces unless necessary for exports or clarity
-- Prefer functional array methods (flatMap, filter, map) over for loops; use type guards on filter to maintain type inference downstream
-- In `src/config`, follow the existing self-export pattern at the top of the file (for example `export * as ConfigAgent from "./agent"`) when adding a new config module.
+- **Coverage standard:** Pragmatic. Target 100% on new LockedCode code in `packages/opencode/src/security/`. Inherited OpenCode code retains existing coverage — no retroactive gap-filling unless we modify it.
 
-Reduce total variable count by inlining when a value is only used once.
+- **Commit message format:** `LC-NNN: one-line summary`
 
-```ts
-// Good
-const journal = await Bun.file(path.join(dir, "journal.json")).json()
+- **Branch policy:** Push directly to `dev`. No feature branches for solo work.
 
-// Bad
-const journalPath = path.join(dir, "journal.json")
-const journal = await Bun.file(journalPath).json()
-```
+- **What NOT to do:**
+  - Do not add dependencies without architectural justification
+  - Do not restructure inherited OpenCode code — add hooks and interception points only
+  - Do not add CI workflows
+  - Do not add task tracking to any committed file
+  - Do not reference or update the audit document
+  - Do not write code outside the task's defined scope
+  - Do not modify files outside `packages/opencode/src/security/` unless the task explicitly requires it
 
-### Destructuring
+- **Effect-ts patterns:** All new services use `Context.Service + Layer`. Dependencies injected via `yield*` in `Effect.gen`. Follow existing codebase patterns (131 existing Effect services). Self-reexport at the bottom of each module file: `export * as ModuleName from "."` or `export * as ModuleName from "./filename"`.
 
-Avoid unnecessary destructuring. Use dot notation to preserve context.
+- **Security layer location:** All new LockedCode code in `packages/opencode/src/security/` with subdirectories: confinement/, scanning/, dlp/, injection/, secrets/, audit/, policy/, trust/, cascade/.
 
-```ts
-// Good
-obj.a
-obj.b
+- **External tools:** Semgrep and YARA are system binaries invoked via child process (detected on PATH). Graceful degradation when unavailable. Never bundled as npm dependencies.
 
-// Bad
-const { a, b } = obj
-```
+- **Inherited code policy:** Modifications to files outside `packages/opencode/src/security/` must be minimal, surgical, and documented in the task report's NOTES FOR THE ARCHITECT section.
 
-### Variables
+- **Style guide (inherited from OpenCode):**
+  - Avoid `try`/`catch` where possible
+  - Avoid `any` type
+  - Use Bun APIs when possible (e.g., `Bun.file()`)
+  - Rely on type inference — avoid explicit type annotations unless necessary for exports
+  - Prefer functional array methods (flatMap, filter, map) over for loops
+  - Avoid unnecessary destructuring — use dot notation
+  - Prefer `const` over `let` and ternaries over reassignment
+  - Avoid `else` statements — prefer early returns
+  - Snake_case for Drizzle column names
+  - No barrel index.ts files in multi-sibling directories
 
-Prefer `const` over `let`. Use ternaries or early returns instead of reassignment.
+- **Style guide (inherited from OpenCode):**
+  - Avoid `try`/`catch` where possible
+  - Avoid `any` type
+  - Use Bun APIs when possible (e.g., `Bun.file()`)
+  - Rely on type inference — avoid explicit type annotations unless necessary for exports
+  - Prefer functional array methods (flatMap, filter, map) over for loops
+  - Avoid unnecessary destructuring — use dot notation
+  - Prefer `const` over `let` and ternaries over reassignment
+  - Avoid `else` statements — prefer early returns
+  - Snake_case for Drizzle column names
+  - No barrel index.ts files in multi-sibling directories
 
-```ts
-// Good
-const foo = condition ? 1 : 2
+- **Testing:**
+  - Avoid mocks as much as possible
+  - Test actual implementation, do not duplicate logic into tests
+  - Run tests from package dirs (e.g., `packages/opencode`), never from repo root
 
-// Bad
-let foo
-if (condition) foo = 1
-else foo = 2
-```
+- **Config module pattern:**
+  - Follow the existing self-export pattern at the top of the file (e.g., `export * as ConfigAgent from "./agent"`)
+  - New security config modules should follow the same pattern
 
-### Control Flow
-
-Avoid `else` statements. Prefer early returns.
-
-```ts
-// Good
-function foo() {
-  if (condition) return 1
-  return 2
-}
-
-// Bad
-function foo() {
-  if (condition) return 1
-  else return 2
-}
-```
-
-### Schema Definitions (Drizzle)
-
-Use snake_case for field names so column names don't need to be redefined as strings.
-
-```ts
-// Good
-const table = sqliteTable("session", {
-  id: text().primaryKey(),
-  project_id: text().notNull(),
-  created_at: integer().notNull(),
-})
-
-// Bad
-const table = sqliteTable("session", {
-  id: text("id").primaryKey(),
-  projectID: text("project_id").notNull(),
-  createdAt: integer("created_at").notNull(),
-})
-```
-
-## Testing
-
-- Avoid mocks as much as possible
-- Test actual implementation, do not duplicate logic into tests
-- Tests cannot run from repo root (guard: `do-not-run-tests-from-root`); run from package dirs like `packages/opencode`.
-
-## Type Checking
-
-- Always run `bun typecheck` from package directories (e.g., `packages/opencode`), never `tsc` directly.
+- **Task completion report:**
+  - Every prompt includes the task report template from CONVENTIONS.md
+  - Fill every slot with a literal value or "N/A"
+  - Do not omit slots or substitute markdown tables
