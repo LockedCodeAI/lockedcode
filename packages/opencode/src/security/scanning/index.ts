@@ -9,6 +9,7 @@ import { EntropyScanner } from "./entropy"
 import { SecretScanner } from "../secrets"
 import { InjectionScanner } from "../injection"
 import { CustomScanner } from "../rules/custom-scanner"
+import { LicenseScanner } from "../license"
 
 const log = Log.create({ service: "scanning" })
 
@@ -80,6 +81,10 @@ export const layer = Layer.effect(
     // Register Custom scanner
     const custom = yield* CustomScanner()
     scanners.push(custom)
+
+    // Register License scanner
+    const license = yield* LicenseScanner()
+    scanners.push(license)
 
     let noScannerWarning = false
 

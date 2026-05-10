@@ -11,6 +11,7 @@ import { UninstallCommand } from "./cli/cmd/uninstall"
 import { ModelsListCommand, ModelsApproveCommand, ModelsBlockCommand, ModelsReportCommand } from "./cli/cmd/models"
 import { SIEMExportCommand, SIEMStreamCommand } from "./cli/cmd/siem"
 import { ComplianceReportCommand } from "./cli/cmd/compliance"
+import { LicenseScanCommand, LicenseReportCommand } from "./cli/cmd/license"
 import { UI } from "./cli/ui"
 import { Installation } from "./installation"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
@@ -180,6 +181,8 @@ const cli = yargs(args)
   .command(SIEMExportCommand)
   .command(SIEMStreamCommand)
   .command(ComplianceReportCommand)
+  .command(LicenseScanCommand)
+  .command(LicenseReportCommand)
   .fail((msg, err) => {
     if (
       msg?.startsWith("Unknown argument") ||
