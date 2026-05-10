@@ -32,6 +32,7 @@ import { SessionCommand } from "./cli/cmd/session"
 import { DbCommand } from "./cli/cmd/db"
 import { SecurityCheckCommand } from "./cli/cmd/security-check"
 import { RulesListCommand, RulesTestCommand } from "./cli/cmd/rules"
+import { ProvenanceCommand } from "./cli/cmd/provenance"
 import path from "path"
 import { Global } from "@opencode-ai/core/global"
 import { JsonMigration } from "@/storage/json-migration"
@@ -182,6 +183,7 @@ const cli = yargs(args)
   .command(SecurityCheckCommand)
   .command(RulesListCommand)
   .command(RulesTestCommand)
+  .command(ProvenanceCommand)
   .fail((msg, err) => {
     if (
       msg?.startsWith("Unknown argument") ||

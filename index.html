@@ -23,6 +23,7 @@
       --accent-glow: rgba(0, 212, 170, 0.12);
       --danger: #ff4d6a;
       --warning: #ffc244;
+      --v2: #7c6df0;
       --mono: 'JetBrains Mono', monospace;
       --sans: 'Instrument Sans', system-ui, sans-serif;
     }
@@ -321,6 +322,23 @@
       font-family: var(--mono);
     }
 
+    /* ── Section divider ── */
+    .section-divider {
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-dim);
+      padding: 1.5rem 2rem 0.5rem;
+      background: var(--bg-surface);
+      border-top: 2px solid var(--border-bright);
+    }
+
+    .section-divider .v2-label {
+      color: var(--v2);
+    }
+
     /* ── Audience cards ── */
     .audience-grid {
       display: grid;
@@ -449,42 +467,6 @@
       color: var(--accent);
     }
 
-    /* ── Roadmap ── */
-    .roadmap-list {
-      list-style: none;
-      margin: 1rem 0;
-    }
-
-    .roadmap-list li {
-      padding: 0.75rem 0;
-      border-bottom: 1px solid var(--border);
-      font-size: 0.9rem;
-      color: var(--text-muted);
-      line-height: 1.6;
-    }
-
-    .roadmap-list li:last-child {
-      border-bottom: none;
-    }
-
-    .roadmap-list li strong {
-      color: var(--text);
-    }
-
-    .roadmap-tag {
-      font-family: var(--mono);
-      font-size: 0.65rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      padding: 0.15rem 0.5rem;
-      border-radius: 100px;
-      border: 1px solid var(--border);
-      color: var(--text-dim);
-      margin-left: 0.5rem;
-      vertical-align: middle;
-    }
-
     /* ── Footer ── */
     footer {
       padding: 3rem 2rem;
@@ -566,7 +548,7 @@
       <p>LockedCode is a security-hardened fork of <a href="https://github.com/anomalyco/opencode">OpenCode</a>, the open-source AI coding agent with over 150,000 GitHub stars and 6.5 million monthly users. OpenCode lets LLMs read files, write code, run shell commands, and autonomously build projects in your workspace. It's fast, flexible, and provider-agnostic.</p>
       <p>It's also entirely trust-based. The LLM proposes an action, the developer gets a confirmation prompt, and the action executes. There are no hard boundaries on what the agent can access, no scanning of what it produces, no audit trail of what it did, and no protection against what it sends to the model provider. For solo developers using frontier models from trusted providers, that's fine.</p>
       <p>For corporate development teams — especially those using open-source, self-hosted, or offline models to manage token costs — it's a non-starter.</p>
-      <p><strong>LockedCode fixes this.</strong> It adds a comprehensive security layer between the LLM's intent and the agent's execution. Every file write passes through static scanning. Every shell command is parsed and analyzed. Every outbound context payload is checked for secrets and PII. Every action is confined to the project directory at the operating system level. Everything is logged in an immutable audit trail. And every security decision is configurable via declarative policy.</p>
+      <p><strong>LockedCode fixes this.</strong> It adds a comprehensive security layer between the LLM's intent and the agent's execution. Every file write passes through static scanning. Every shell command is parsed and analyzed. Every outbound context payload is checked for secrets and PII. Every action is confined to the project directory at the operating system level. Everything is logged in an immutable audit trail. Every security decision is configurable via declarative policy. Every model that touches your code is tracked. Every compliance requirement is documented. And when something goes wrong, you can roll back to safety.</p>
       <p>LockedCode is not a wrapper around OpenCode. It <em>is</em> OpenCode — every feature, every provider integration, every TUI capability — with a security layer that makes it safe for real codebases, real teams, and real compliance requirements.</p>
     </section>
 
@@ -582,7 +564,9 @@
         <li><span class="label">Executes</span>What the model executes is parsed, analyzed, and validated against the project boundary before any shell command runs.</li>
         <li><span class="label">Sees</span>What the model sees is scanned for secrets, PII, and sensitive file content before it leaves the machine.</li>
         <li><span class="label">Reads</span>What the model reads is checked for prompt injection attacks designed to manipulate the agent's behavior.</li>
+        <li><span class="label">Installs</span>What the model installs is checked for typosquatting, suspicious post-install scripts, and package policy violations.</li>
         <li><span class="label">Reaches</span>Where the model can reach is confined to the project directory at the kernel level — no amount of clever LLM output gets past a Landlock jail.</li>
+        <li><span class="label">Tracked</span>Which model produced which code is recorded per-file so compromised models can be identified and their output reviewed.</li>
         <li><span class="label">Logged</span>Everything that happens is recorded in an immutable, content-hashed audit trail that satisfies compliance frameworks.</li>
       </ul>
     </section>
@@ -619,6 +603,10 @@
       <h2>Feature Overview</h2>
 
       <div class="feature-grid">
+
+        <!-- ── Core Security ── -->
+        <div class="section-divider">Core Security</div>
+
         <div class="feature-card">
           <h3>Directory Confinement</h3>
           <p>Every file operation is confined to the project directory tree, enforced at the OS level — not just application-level path checks.</p>
@@ -634,11 +622,14 @@
 
         <div class="feature-card">
           <h3>Static Scanning Pipeline</h3>
-          <p>Every piece of code the LLM proposes is scanned before it touches the filesystem.</p>
+          <p>Every piece of code the LLM proposes is scanned before it touches the filesystem. Six scanners run in parallel.</p>
           <ul>
             <li>Semgrep integration with custom rulesets tuned for LLM failure modes</li>
             <li>YARA signature scanning for known malicious patterns</li>
             <li>Entropy analysis catches obfuscated payloads</li>
+            <li>Secret detection across 50+ credential formats</li>
+            <li>Prompt injection detection in ingested files</li>
+            <li>Custom rule scanner for organization-specific patterns</li>
             <li>Scans fire before every file write and edit — malicious code never touches disk</li>
           </ul>
         </div>
@@ -661,7 +652,7 @@
             <li>Secret scanning on outbound context across 50+ credential formats</li>
             <li>PII detection — emails, phone numbers, SSNs, credit card numbers</li>
             <li>File-level sensitivity policy via configurable glob patterns</li>
-            <li>Redaction mode — replace secrets with typed placeholders</li>
+            <li>Redaction mode — replace secrets with typed placeholders so the model sees code structure without sensitive content</li>
           </ul>
         </div>
 
@@ -671,20 +662,25 @@
           <ul>
             <li>Role-override attempts and system prompt markers in file content</li>
             <li>Unicode manipulation — invisible characters, bidirectional overrides, homoglyphs</li>
+            <li>Encoded instructions in comments and metadata</li>
             <li>Dependency metadata scanning before the model sees them</li>
             <li>Configurable sensitivity levels per trust boundary</li>
           </ul>
         </div>
 
         <div class="feature-card">
-          <h3>Secret Detection in Generated Code</h3>
-          <p>LLMs sometimes hallucinate realistic-looking credentials or reproduce real secrets from training data.</p>
+          <h3>Dependency Vetting</h3>
+          <p>Analyzes every package the LLM tries to install before the install command executes.</p>
           <ul>
-            <li>Pre-write scanning for 50+ credential formats</li>
-            <li>Context-aware — distinguishes secrets from test fixtures</li>
-            <li>Git-aware — secrets are caught before entering Git history</li>
+            <li>Typosquatting detection — flags packages suspiciously similar to popular ones (Levenshtein distance, scope confusion, prefix/suffix tricks)</li>
+            <li>Post-install script risk detection</li>
+            <li>Support for 9 package managers: npm, bun, yarn, pnpm, pip, go, cargo, gem, composer</li>
+            <li>Configurable blocked packages and scopes via policy</li>
           </ul>
         </div>
+
+        <!-- ── Governance & Compliance ── -->
+        <div class="section-divider">Governance &amp; Compliance</div>
 
         <div class="feature-card">
           <h3>Audit Trail</h3>
@@ -702,9 +698,10 @@
           <h3>Policy Engine</h3>
           <p>Declarative, configurable security rules that drive every security decision.</p>
           <ul>
-            <li>YAML configuration at the project root (<code>lockedcode.yaml</code>)</li>
+            <li>YAML/JSON configuration at the project root</li>
             <li>Policy hierarchy: global → organization → project → session</li>
             <li>Three strictness levels: <code>strict</code>, <code>standard</code>, <code>permissive</code></li>
+            <li>Model approval and blocking lists</li>
             <li>Sensible defaults — works out of the box without a policy file</li>
           </ul>
         </div>
@@ -716,7 +713,105 @@
             <li>Per-action risk scores based on what the action does</li>
             <li>Score-driven UX — auto-approve, notify, require approval, or hard-block</li>
             <li>Session trust decay for repeated high-risk proposals</li>
-            <li>Persistent per-model trust metrics</li>
+            <li>Persistent per-model trust metrics across sessions</li>
+          </ul>
+        </div>
+
+        <div class="feature-card">
+          <h3>Model Provenance Tracking</h3>
+          <p>Track which model produced which code across every session. Critical for incident response when a model is found to be compromised.</p>
+          <ul>
+            <li>Per-file attribution recording model, session, operation, and content hash</li>
+            <li><code>lockedcode provenance &lt;file&gt;</code> shows full model history for any file</li>
+            <li><code>lockedcode provenance --model &lt;id&gt;</code> shows all files a model touched</li>
+            <li><code>lockedcode provenance --review &lt;id&gt;</code> identifies all files needing review after a model compromise</li>
+          </ul>
+        </div>
+
+        <div class="feature-card">
+          <h3>Model Registry &amp; Approval</h3>
+          <p>Centralized control over which models developers can connect to.</p>
+          <ul>
+            <li>Organization-level approved and blocked model lists via policy</li>
+            <li>Unapproved models are rejected before they can execute</li>
+            <li>Partial matching — approve <code>gpt-4</code> to allow all GPT-4 variants</li>
+          </ul>
+        </div>
+
+        <div class="feature-card">
+          <h3>Compliance Report Generation</h3>
+          <p>Automated compliance evidence from audit trail data.</p>
+          <ul>
+            <li>Per-session and per-project reports mapping to SOC2, ISO 27001, HIPAA, and FedRAMP controls</li>
+            <li>Evidence of scan coverage, approval workflows, and policy enforcement</li>
+            <li>Exportable reports suitable for auditor review</li>
+          </ul>
+        </div>
+
+        <div class="feature-card">
+          <h3>SIEM Integration</h3>
+          <p>Export audit trail events to enterprise security monitoring platforms.</p>
+          <ul>
+            <li>Structured event export in CEF, OCSF, and JSON-over-syslog formats</li>
+            <li>Real-time streaming to Splunk, Datadog, Elastic, and generic syslog endpoints</li>
+            <li>Configurable event filtering and severity thresholds</li>
+          </ul>
+        </div>
+
+        <!-- ── Response & Recovery ── -->
+        <div class="section-divider">Response &amp; Recovery</div>
+
+        <div class="feature-card">
+          <h3>Session Recording &amp; Replay</h3>
+          <p>Full session replay for incident investigation.</p>
+          <ul>
+            <li>Replayable timeline of every LLM proposal, scan result, file change, and approval decision</li>
+            <li>Visual replay interface showing the session as it happened</li>
+            <li>Export for forensic analysis</li>
+          </ul>
+        </div>
+
+        <div class="feature-card">
+          <h3>Rollback &amp; Quarantine</h3>
+          <p>Automated response when a security issue is detected after code is written.</p>
+          <ul>
+            <li>Quarantine flagged changes to a holding branch</li>
+            <li>Automatic working tree revert with scan results and remediation guidance</li>
+            <li>Configurable auto-rollback policy by finding severity</li>
+          </ul>
+        </div>
+
+        <div class="feature-card">
+          <h3>License Contamination Detection</h3>
+          <p>Protects against IP liability from LLM-generated code that reproduces copyleft-licensed open-source code.</p>
+          <ul>
+            <li>Code fingerprinting against known open-source code bodies</li>
+            <li>License classification — permissive, copyleft, proprietary</li>
+            <li>Configurable policy for handling matches</li>
+          </ul>
+        </div>
+
+        <!-- ── Extensibility & Operations ── -->
+        <div class="section-divider">Extensibility &amp; Operations</div>
+
+        <div class="feature-card">
+          <h3>Custom Rule Authoring</h3>
+          <p>SDK for security teams to write organization-specific scanning rules without forking LockedCode.</p>
+          <ul>
+            <li>JSON rule definition format supporting content, command, filename, and outbound patterns</li>
+            <li>Built-in test framework: <code>lockedcode rules test</code> validates rules against test cases</li>
+            <li>Custom rules merge with bundled rules — override built-in patterns by ID</li>
+            <li><code>lockedcode rules list</code> shows all active rules with sources</li>
+          </ul>
+        </div>
+
+        <div class="feature-card">
+          <h3>Runtime Monitoring</h3>
+          <p>OS-level behavioral monitoring of what actually happens during execution, beyond static scanning.</p>
+          <ul>
+            <li>eBPF-based syscall monitoring on Linux — file opens, network connections, process spawning</li>
+            <li>Process tree analysis for unexpected child processes</li>
+            <li>Network activity detection for connections to unexpected destinations</li>
           </ul>
         </div>
 
@@ -735,29 +830,12 @@
           <p>Full functionality with zero internet access. No cloud dependencies, no telemetry, no phone-home.</p>
           <ul>
             <li>Bundled Semgrep rules, YARA signatures, and detection patterns</li>
-            <li>Zero runtime network dependencies</li>
+            <li>Centralized rule resolver with versioned manifest</li>
+            <li>Startup compliance verification for air-gap environments</li>
             <li>Offline rule set updates via versioned packages</li>
           </ul>
         </div>
       </div>
-    </section>
-
-    <!-- ═══════ ROADMAP ═══════ -->
-    <section id="roadmap">
-      <h2>V2 Roadmap</h2>
-      <p>These features are planned for V2 and are not yet implemented:</p>
-      <ul class="roadmap-list">
-        <li><strong>Runtime Monitoring</strong> — eBPF-based syscall monitoring, process tree analysis, and network activity detection <span class="roadmap-tag">v2</span></li>
-        <li><strong>Model Provenance Tracking</strong> — per-file, per-line attribution of which model generated the code <span class="roadmap-tag">v2</span></li>
-        <li><strong>Model Registry &amp; Approval Workflow</strong> — centralized control over which models developers can connect to <span class="roadmap-tag">v2</span></li>
-        <li><strong>Dependency Vetting</strong> — typosquatting detection, vulnerability checking, and approved package registry enforcement <span class="roadmap-tag">v2</span></li>
-        <li><strong>SIEM Integration</strong> — structured event export to Splunk, Datadog, Elastic in CEF, OCSF, and JSON formats <span class="roadmap-tag">v2</span></li>
-        <li><strong>Compliance Report Generation</strong> — automated evidence generation for SOC2, ISO 27001, HIPAA, and FedRAMP <span class="roadmap-tag">v2</span></li>
-        <li><strong>License Contamination Detection</strong> — code fingerprinting against known open-source bodies to flag license issues <span class="roadmap-tag">v2</span></li>
-        <li><strong>Session Recording &amp; Replay</strong> — full session replay with visual timeline interface <span class="roadmap-tag">v2</span></li>
-        <li><strong>Custom Rule Authoring</strong> — SDK/DSL for writing organization-specific scanning rules <span class="roadmap-tag">v2</span></li>
-        <li><strong>Rollback &amp; Quarantine</strong> — automated response including quarantine to a holding branch <span class="roadmap-tag">v2</span></li>
-      </ul>
     </section>
 
     <!-- ═══════ INSTALLATION ═══════ -->
@@ -819,7 +897,7 @@
     <!-- ═══════ QUICK START ═══════ -->
     <section id="config">
       <h2>Quick Start: Security Configuration</h2>
-      <p>LockedCode works out of the box with sensible defaults. For custom configuration, create a <code>lockedcode.yaml</code> at your project root:</p>
+      <p>LockedCode works out of the box with sensible defaults. For custom configuration, create a <code>lockedcode.json</code> at your project root:</p>
 
 <pre class="yaml"><code><span class="key">security</span>:
   <span class="key">strictness</span>: <span class="val">standard</span>          <span class="comment"># strict | standard | permissive</span>
@@ -848,6 +926,13 @@
     <span class="key">prompt_above</span>: <span class="val">50</span>            <span class="comment"># require approval for medium+ risk</span>
     <span class="key">block_above</span>: <span class="val">90</span>             <span class="comment"># hard-block critical risk</span>
 
+  <span class="key">models</span>:
+    <span class="key">approved</span>:                   <span class="comment"># empty = all allowed</span>
+      - <span class="val">claude-sonnet-4</span>
+      - <span class="val">gpt-4o</span>
+    <span class="key">blocked</span>:
+      - <span class="val">untrusted-model-v3</span>
+
   <span class="key">audit</span>:
     <span class="key">retention_days</span>: <span class="val">90</span></code></pre>
     </section>
@@ -874,14 +959,23 @@
       <p>Everything OpenCode does, plus:</p>
       <ul class="diff-list">
         <li>OS-level directory confinement (Landlock, sandbox-exec, restricted tokens)</li>
-        <li>Static scanning of all LLM-generated code before it touches the filesystem</li>
-        <li>Shell command parsing and analysis before execution</li>
+        <li>Six-scanner static analysis pipeline (Semgrep, YARA, Entropy, Secrets, Injection, Custom)</li>
+        <li>Shell command structural parsing and analysis before execution</li>
         <li>Outbound DLP preventing secrets and PII from reaching the model</li>
         <li>Prompt injection detection on ingested files</li>
-        <li>Secret detection in generated code</li>
+        <li>Dependency vetting with typosquatting detection</li>
         <li>Immutable, content-hashed audit trail</li>
         <li>Declarative policy engine with configurable strictness</li>
-        <li>Trust scoring with score-driven approval UX</li>
+        <li>Trust scoring with session decay and model trust history</li>
+        <li>Model provenance tracking — know which model wrote which code</li>
+        <li>Model registry with approval and blocking lists</li>
+        <li>Compliance report generation for SOC2, ISO 27001, HIPAA, FedRAMP</li>
+        <li>SIEM integration (Splunk, Datadog, Elastic)</li>
+        <li>Session recording and replay for incident investigation</li>
+        <li>License contamination detection</li>
+        <li>Rollback and quarantine for automated response</li>
+        <li>Custom rule authoring SDK</li>
+        <li>Runtime monitoring (eBPF)</li>
         <li>Multi-agent security cascade</li>
         <li>Full air-gap mode with bundled rule sets</li>
       </ul>

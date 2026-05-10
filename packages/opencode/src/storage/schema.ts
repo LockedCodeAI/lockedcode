@@ -4,3 +4,4 @@ export { SessionTable, MessageTable, PartTable, TodoTable, PermissionTable } fro
 export { SessionShareTable } from "../share/share.sql"
 export { WorkspaceTable } from "../control-plane/workspace.sql"
 export { SecurityEventTable, ScanResultTable, PolicyDecisionTable } from "../security/audit/schema"
+export { FileProvenanceTable } from "../security/provenance/schema"
