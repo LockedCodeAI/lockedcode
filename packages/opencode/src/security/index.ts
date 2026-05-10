@@ -1,6 +1,7 @@
 import { Context, Effect, Layer } from "effect"
 import * as Log from "@opencode-ai/core/util/log"
 import * as SecurityEvent from "./event"
+import { analyzeCommand } from "./scanning/command-analyzer"
 import type {
   SecurityConfig,
   ScanResult,
@@ -80,16 +81,36 @@ export const layer = Layer.effect(
       return yield* scanning.scan(content, scanMeta)
     })
 
+    // scanCommand in layer — uses analyzeCommand + scanning
     const scanCommand = Effect.fn("Security.scanCommand")(function* (
       command: string,
       metadata: Record<string, unknown>,
     ) {
       log.debug("scanCommand called", { commandLength: command.length })
+      const analysis = analyzeCommand(command)
       const scanMeta: ScanMetadata = {
         toolName: metadata.toolName as string ?? metadata.toolCallID as string,
         operation: "command",
       }
-      return yield* scanning.scan(command, scanMeta)
+      const fileScan = yield* scanning.scan(command, scanMeta)
+      const mergedFindings = [
+        ...analysis.findings,
+        ...fileScan.findings.filter(
+          (f) => !analysis.findings.some((af) => af.ruleId === f.ruleId),
+        ),
+      ]
+      const severityOrder: Array<"info" | "warning" | "high" | "critical"> = ["info", "warning", "high", "critical"]
+      const highestSeverity = severityOrder.reduce((highest, sev) =>
+        mergedFindings.some((f) => f.severity === sev) ? sev : highest, "info" as const)
+      return {
+        severity: highestSeverity,
+        action: highestSeverity === "critical" ? "warn" as const : "pass" as const,
+        findings: mergedFindings,
+        ruleId: analysis.findings[0]?.ruleId ?? "clean",
+        matchedContent: analysis.findings[0]?.matchedContent ?? "",
+        remediation: analysis.findings[0]?.remediation ?? "Command analysis passed.",
+        scanner: "command-analyzer",
+      } as ScanResult
     })
 
     const checkConfinement = Effect.fn("Security.checkConfinement")(function* (
@@ -186,16 +207,36 @@ export const busLayer = Layer.effect(
       return result
     })
 
+    // scanCommand in busLayer — uses analyzeCommand + scanning + bus events
     const scanCommand = Effect.fn("Security.scanCommand")(function* (
       command: string,
       metadata: Record<string, unknown>,
     ) {
       log.debug("scanCommand called", { commandLength: command.length })
+      const analysis = analyzeCommand(command)
       const scanMeta: ScanMetadata = {
         toolName: metadata.toolName as string ?? metadata.toolCallID as string,
         operation: "command",
       }
-      return yield* scanning.scan(command, scanMeta)
+      const fileScan = yield* scanning.scan(command, scanMeta)
+      const mergedFindings = [
+        ...analysis.findings,
+        ...fileScan.findings.filter(
+          (f) => !analysis.findings.some((af) => af.ruleId === f.ruleId),
+        ),
+      ]
+      const severityOrder: Array<"info" | "warning" | "high" | "critical"> = ["info", "warning", "high", "critical"]
+      const highestSeverity = severityOrder.reduce((highest, sev) =>
+        mergedFindings.some((f) => f.severity === sev) ? sev : highest, "info" as const)
+      return {
+        severity: highestSeverity,
+        action: highestSeverity === "critical" ? "warn" as const : "pass" as const,
+        findings: mergedFindings,
+        ruleId: analysis.findings[0]?.ruleId ?? "clean",
+        matchedContent: analysis.findings[0]?.matchedContent ?? "",
+        remediation: analysis.findings[0]?.remediation ?? "Command analysis passed.",
+        scanner: "command-analyzer",
+      } as ScanResult
     })
 
     const checkConfinement = Effect.fn("Security.checkConfinement")(function* (
