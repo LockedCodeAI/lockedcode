@@ -166,6 +166,7 @@ export interface SecurityEvent {
   readonly eventType: SecurityEventType
   readonly sessionId: string
   readonly timestamp: number
+  readonly severity?: Severity
   readonly toolName: string
   readonly modelId: string
   readonly contentHash?: string
