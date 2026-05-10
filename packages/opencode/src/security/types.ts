@@ -110,14 +110,17 @@ export interface ConfinementConfig {
  * Result of an outbound DLP scan.
  */
 export interface DLPResult {
+  readonly status: "clean" | "secret_detected" | "pii_detected"
   readonly detections: DLPDetection[]
 }
 
 export interface DLPDetection {
   readonly type: "secret" | "pii" | "sensitive_file"
   readonly patternId: string
-  readonly matchedContent: string
+  readonly patternName: string
   readonly severity: Severity
+  readonly lineNumber: number
+  readonly snippet: string
 }
 
 /**
@@ -177,8 +180,24 @@ export interface SecurityConfig {
   readonly enabled: boolean
   readonly confinement: ConfinementConfig
   readonly scanning: ScanningConfig
-  readonly dlp: { readonly enabled: boolean }
+  readonly dlp: DLPConfig
   readonly audit: { readonly enabled: boolean }
+}
+
+/**
+ * DLP-specific configuration.
+ */
+export interface DLPConfig {
+  readonly enabled: boolean
+  readonly scanSecrets: boolean
+  readonly scanPii: boolean
+  readonly piiCategories: {
+    readonly email: boolean
+    readonly phone: boolean
+    readonly ssn: boolean
+    readonly creditCard: boolean
+    readonly ipAddress: boolean
+  }
 }
 
 /**
@@ -211,6 +230,11 @@ export const defaultSecurityConfig: SecurityConfig = {
     scanOnWrite: true,
     scanOnEdit: true,
   },
-  dlp: { enabled: true },
+  dlp: {
+    enabled: true,
+    scanSecrets: true,
+    scanPii: true,
+    piiCategories: { email: true, phone: true, ssn: true, creditCard: true, ipAddress: true },
+  },
   audit: { enabled: true },
 }

@@ -6,6 +6,7 @@ import type { Scanner } from "./scanner"
 import { SemgrepScanner } from "./semgrep"
 import { YaraScanner } from "./yara"
 import { EntropyScanner } from "./entropy"
+import { SecretScanner } from "../secrets"
 
 const log = Log.create({ service: "scanning" })
 
@@ -65,6 +66,10 @@ export const layer = Layer.effect(
       const entropy = yield* EntropyScanner(cfg.entropy)
       scanners.push(entropy)
     }
+
+    // Register Secret scanner
+    const secrets = yield* SecretScanner()
+    scanners.push(secrets)
 
     let noScannerWarning = false
 

@@ -247,12 +247,19 @@ export const busLayer = Layer.effect(
       return yield* confinement.checkPath(path, operation)
     })
 
+    // scanOutbound in busLayer
     const scanOutbound = Effect.fn("Security.scanOutbound")(function* (
       content: string,
       metadata: Record<string, unknown>,
     ) {
       log.debug("scanOutbound called", { contentLength: content.length })
-      return yield* dlp.scanOutbound(content, metadata.filePath as string ?? "")
+      const result = yield* dlp.scanOutbound(content, metadata.filePath as string ?? "")
+      if (result.status === "secret_detected") {
+        log.warn("DLP: secrets detected in outbound context", { count: result.detections.length })
+      } else if (result.status === "pii_detected") {
+        log.info("DLP: PII detected in outbound context", { count: result.detections.length })
+      }
+      return result
     })
 
     const evaluatePolicy = Effect.fn("Security.evaluatePolicy")(function* (
