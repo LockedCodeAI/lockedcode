@@ -24,7 +24,7 @@
     "db": "bun drizzle-kit"
   },
   "bin": {
-    "lockedcode": "./bin/opencode"
+    "lockedcode": "./bin/lockedcode"
   },
   "exports": {
     "./*": "./src/*.ts"
