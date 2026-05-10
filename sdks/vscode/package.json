@@ -1,7 +1,7 @@
 {
-  "name": "opencode",
-  "displayName": "opencode",
-  "description": "opencode for VS Code",
+  "name": "lockedcode-vscode",
+  "displayName": "LockedCode for VS Code",
+  "description": "LockedCode for VS Code",
   "version": "1.14.44",
   "publisher": "sst-dev",
   "repository": {
