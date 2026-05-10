@@ -225,6 +225,15 @@ for (const item of targets) {
     },
   })
 
+  // Copy bundled rules into dist
+  const rulesDir = path.join(dir, "..", "..", "rules")
+  const distRulesDir = `dist/${name}/rules`
+  if (fs.existsSync(rulesDir)) {
+    await $`mkdir -p ${distRulesDir}`
+    await $`cp -r ${rulesDir}/* ${distRulesDir}/`
+    console.log(`Bundled rules copied to ${distRulesDir}`)
+  }
+
   // Smoke test: only run if binary is for current platform
   if (item.os === process.platform && item.arch === process.arch && !item.abi) {
     const binaryPath = `dist/${name}/bin/opencode`

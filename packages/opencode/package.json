@@ -5,6 +5,13 @@
   "type": "module",
   "license": "MIT",
   "private": true,
+  "description": "Secure Agentic Coding — Security-hardened AI coding agent for corporate development",
+  "homepage": "https://lockedcode.ai",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/LockedCodeAI/lockedcode"
+  },
+  "keywords": ["ai", "coding", "agent", "security", "llm", "lockedcode", "scanning", "confinement", "dlp", "audit"],
   "scripts": {
     "typecheck": "tsgo --noEmit",
     "test": "bun test --timeout 30000",
