@@ -1,0 +1,71 @@
+rules:
+  - id: lockedcode.crypto-mining.pool-url
+    pattern-either:
+      - pattern: |
+          stratum+tcp://...
+      - pattern: |
+          stratum+ssl://...
+      - pattern: |
+          "pool." + ...
+      - pattern: |
+          "mine." + $X
+      - pattern: |
+          miningpool...
+      - pattern: |
+          "ethpool"...
+      - pattern: |
+          "miningpool"...
+    message: "Cryptocurrency mining pool URL pattern detected — possible crypto miner"
+    severity: ERROR
+    languages:
+      - javascript
+      - typescript
+      - python
+      - go
+      - java
+      - ruby
+      - shell
+
+  - id: lockedcode.crypto-mining.wallet-address
+    patterns:
+      - pattern-either:
+          - pattern: |
+              "1[A-Za-z0-9]{25,34}"
+          - pattern: |
+              "0x[A-Fa-f0-9]{40}"
+          - pattern: |
+              "4[A-Za-z0-9]{95}"
+      - pattern-inside: |
+          $VAR = "..."
+    message: "Cryptocurrency wallet address pattern detected in source code — possible crypto miner"
+    severity: WARNING
+    languages:
+      - javascript
+      - typescript
+      - python
+      - go
+      - java
+      - ruby
+
+  - id: lockedcode.crypto-mining.cpu-maximization
+    patterns:
+      - pattern-either:
+          - pattern: |
+              os.cpus().length
+          - pattern: |
+              multiprocessing.cpu_count()
+          - pattern: |
+              runtime.NumCPU()
+      - pattern-inside: |
+          function ...(...) {
+            ...
+            fetch(...)
+            ...
+          }
+    message: "CPU detection combined with network activity — possible crypto mining beacon"
+    severity: WARNING
+    languages:
+      - javascript
+      - typescript
+      - python
+      - go

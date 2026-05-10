@@ -9,6 +9,7 @@ import type {
   PolicyDecision,
   TrustScore,
   SecurityEvent as SecurityEventData,
+  ScanMetadata,
 } from "./types"
 import { Service as ConfinementService, defaultLayer as confinementLayer } from "./confinement"
 import { Service as ScanningService, defaultLayer as scanningLayer } from "./scanning"
@@ -70,7 +71,13 @@ export const layer = Layer.effect(
       metadata: Record<string, unknown>,
     ) {
       log.debug("scanContent called", { contentLength: content.length })
-      return yield* scanning.scan(content, metadata)
+      const scanMeta: ScanMetadata = {
+        filename: metadata.filename as string | undefined,
+        extension: metadata.extension as string | undefined,
+        toolName: metadata.toolName as string ?? metadata.toolCallID as string,
+        operation: "write",
+      }
+      return yield* scanning.scan(content, scanMeta)
     })
 
     const scanCommand = Effect.fn("Security.scanCommand")(function* (
@@ -78,7 +85,11 @@ export const layer = Layer.effect(
       metadata: Record<string, unknown>,
     ) {
       log.debug("scanCommand called", { commandLength: command.length })
-      return yield* scanning.scan(command, metadata)
+      const scanMeta: ScanMetadata = {
+        toolName: metadata.toolName as string ?? metadata.toolCallID as string,
+        operation: "command",
+      }
+      return yield* scanning.scan(command, scanMeta)
     })
 
     const checkConfinement = Effect.fn("Security.checkConfinement")(function* (
@@ -159,7 +170,13 @@ export const busLayer = Layer.effect(
         toolCallID: String(metadata.toolCallID ?? ""),
         scanners: ["scanning", "secrets", "injection"],
       })
-      const result = yield* scanning.scan(content, metadata)
+      const scanMeta: ScanMetadata = {
+        filename: metadata.filename as string | undefined,
+        extension: metadata.extension as string | undefined,
+        toolName: metadata.toolName as string ?? metadata.toolCallID as string,
+        operation: "write",
+      }
+      const result = yield* scanning.scan(content, scanMeta)
       yield* bus.publish(SecurityEvent.ScanCompleted, {
         sessionID: String(metadata.sessionID ?? ""),
         findings: [],
@@ -174,7 +191,11 @@ export const busLayer = Layer.effect(
       metadata: Record<string, unknown>,
     ) {
       log.debug("scanCommand called", { commandLength: command.length })
-      return yield* scanning.scan(command, metadata)
+      const scanMeta: ScanMetadata = {
+        toolName: metadata.toolName as string ?? metadata.toolCallID as string,
+        operation: "command",
+      }
+      return yield* scanning.scan(command, scanMeta)
     })
 
     const checkConfinement = Effect.fn("Security.checkConfinement")(function* (

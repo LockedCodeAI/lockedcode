@@ -1,0 +1,100 @@
+rules:
+  - id: lockedcode.persistence.cron-write
+    pattern-either:
+      - pattern: |
+          open("/etc/cron...")
+      - pattern: |
+          open("/var/spool/cron/...")
+      - pattern: |
+          crontab ...
+      - pattern: |
+          fs.writeFileSync("/etc/cron...")
+      - pattern: |
+          fs.writeFileSync("/var/spool/cron/...")
+      - pattern: |
+          subprocess.run(["crontab", ...])
+    message: "Writing to cron directories or modifying crontab — possible persistence mechanism"
+    severity: ERROR
+    languages:
+      - javascript
+      - typescript
+      - python
+      - go
+      - ruby
+      - shell
+
+  - id: lockedcode.persistence.systemd-write
+    pattern-either:
+      - pattern: |
+          open("/etc/systemd/...")
+      - pattern: |
+          open("/usr/lib/systemd/...")
+      - pattern: |
+          fs.writeFileSync("/etc/systemd/...")
+      - pattern: |
+          fs.writeFileSync("/usr/lib/systemd/...")
+    message: "Writing to systemd unit directory — possible persistence mechanism"
+    severity: ERROR
+    languages:
+      - javascript
+      - typescript
+      - python
+      - go
+
+  - id: lockedcode.persistence.shell-profile-write
+    pattern-either:
+      - pattern: |
+          open("~/.bashrc")
+      - pattern: |
+          open("~/.zshrc")
+      - pattern: |
+          open("~/.profile")
+      - pattern: |
+          open("~/.bash_profile")
+      - pattern: |
+          fs.writeFileSync("~/.bashrc", ...)
+      - pattern: |
+          fs.writeFileSync("~/.zshrc", ...)
+      - pattern: |
+          fs.writeFileSync("~/.profile", ...)
+    message: "Writing to shell profile file — possible persistence mechanism"
+    severity: ERROR
+    languages:
+      - javascript
+      - typescript
+      - python
+      - go
+      - ruby
+
+  - id: lockedcode.persistence.ssh-authorized-keys-write
+    pattern-either:
+      - pattern: |
+          open("~/.ssh/authorized_keys")
+      - pattern: |
+          open("~/.ssh/authorized_keys2")
+      - pattern: |
+          fs.writeFileSync("~/.ssh/authorized_keys", ...)
+      - pattern: |
+          subprocess.run(["echo", ..., ">>", "~/.ssh/authorized_keys"])
+    message: "Modifying SSH authorized_keys — possible backdoor installation"
+    severity: ERROR
+    languages:
+      - javascript
+      - typescript
+      - python
+      - go
+      - ruby
+      - shell
+
+  - id: lockedcode.persistence.launch-agent-write
+    pattern-either:
+      - pattern: |
+          open("~/Library/LaunchAgents/...")
+      - pattern: |
+          fs.writeFileSync("~/Library/LaunchAgents/...", ...)
+    message: "Writing to macOS LaunchAgents directory — possible persistence mechanism"
+    severity: ERROR
+    languages:
+      - javascript
+      - typescript
+      - python

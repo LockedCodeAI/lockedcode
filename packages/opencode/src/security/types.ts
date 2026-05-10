@@ -12,14 +12,53 @@ export type SecurityStrictness = "strict" | "standard" | "permissive"
 export type Severity = "info" | "warning" | "high" | "critical"
 
 /**
- * Result of a content or command scan.
+ * A single finding from a scanner.
+ */
+export interface ScanFinding {
+  readonly severity: Severity
+  readonly ruleId: string
+  readonly scanner: string
+  readonly matchedContent: string
+  readonly lineNumber?: number
+  readonly remediation?: string
+  readonly confidence: "low" | "medium" | "high"
+}
+
+/**
+ * Improved ScanResult with array of findings.
  */
 export interface ScanResult {
   readonly severity: Severity
+  readonly action: "pass" | "warn" | "block"
+  readonly findings: ScanFinding[]
   readonly ruleId: string
   readonly matchedContent: string
   readonly remediation: string
   readonly scanner: string
+}
+
+/**
+ * Metadata passed to scanners alongside content.
+ */
+export interface ScanMetadata {
+  readonly filename?: string
+  readonly extension?: string
+  readonly toolName?: string
+  readonly operation: "write" | "edit" | "patch" | "command" | "context"
+}
+
+/**
+ * Scanning-specific configuration.
+ */
+export interface ScanningConfig {
+  readonly enabled: boolean
+  readonly semgrep: {
+    readonly enabled: boolean
+    readonly rulesPath?: string
+    readonly timeout: number
+  }
+  readonly scanOnWrite: boolean
+  readonly scanOnEdit: boolean
 }
 
 /**
@@ -127,7 +166,7 @@ export interface SecurityConfig {
   readonly strictness: SecurityStrictness
   readonly enabled: boolean
   readonly confinement: ConfinementConfig
-  readonly scanning: { readonly enabled: boolean }
+  readonly scanning: ScanningConfig
   readonly dlp: { readonly enabled: boolean }
   readonly audit: { readonly enabled: boolean }
 }
@@ -154,7 +193,12 @@ export const defaultSecurityConfig: SecurityConfig = {
     enabled: true,
     preApprovedPaths: defaultPreApprovedPaths,
   },
-  scanning: { enabled: true },
+  scanning: {
+    enabled: true,
+    semgrep: { enabled: true, timeout: 30 },
+    scanOnWrite: true,
+    scanOnEdit: true,
+  },
   dlp: { enabled: true },
   audit: { enabled: true },
 }

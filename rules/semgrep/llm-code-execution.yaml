@@ -1,0 +1,85 @@
+rules:
+  - id: lockedcode.code-execution.eval-call
+    pattern-either:
+      - pattern: |
+          eval($X)
+      - pattern: |
+          eval("..." + $Y)
+      - pattern: |
+          eval(`...`)
+    message: "Dynamic code execution via eval() — possible code injection"
+    severity: WARNING
+    languages:
+      - javascript
+      - typescript
+      - python
+
+  - id: lockedcode.code-execution.function-constructor
+    pattern-either:
+      - pattern: |
+          new Function($X)
+      - pattern: |
+          Function($X)
+    message: "Function constructor with string argument — possible code injection"
+    severity: WARNING
+    languages:
+      - javascript
+      - typescript
+
+  - id: lockedcode.code-execution.node-child-process
+    pattern-either:
+      - pattern: |
+          require("child_process").exec($X)
+      - pattern: |
+          exec($X)
+      - pattern: |
+          execSync($X)
+      - pattern: |
+          execSync(`...`)
+    message: "Shell command execution via child_process — review for injection risk"
+    severity: WARNING
+    languages:
+      - javascript
+      - typescript
+
+  - id: lockedcode.code-execution.python-exec
+    pattern-either:
+      - pattern: |
+          exec($X)
+      - pattern: |
+          eval($X)
+      - pattern: |
+          compile($X, ...)
+    message: "Dynamic code execution in Python — possible injection vector"
+    severity: WARNING
+    languages:
+      - python
+
+  - id: lockedcode.code-execution.subprocess-shell
+    patterns:
+      - pattern-either:
+          - pattern: |
+              subprocess.Popen(..., shell=True)
+          - pattern: |
+              subprocess.run(..., shell=True)
+          - pattern: |
+              subprocess.call(..., shell=True)
+          - pattern: |
+              os.system(...)
+          - pattern: |
+              os.popen(...)
+    message: "Shell execution with shell=True — command injection risk if input is unsanitized"
+    severity: WARNING
+    languages:
+      - python
+
+  - id: lockedcode.code-execution.go-exec
+    pattern-either:
+      - pattern: |
+          exec.Command("bash", "-c", $X)
+      - pattern: |
+          exec.Command("sh", "-c", $X)
+    message: "Shell command execution — review for injection risk"
+    severity: WARNING
+    languages:
+      - go

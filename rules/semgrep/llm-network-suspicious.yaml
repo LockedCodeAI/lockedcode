@@ -1,0 +1,81 @@
+rules:
+  - id: lockedcode.network-suspicious.hardcoded-ip
+    patterns:
+      - pattern-either:
+          - pattern: |
+              fetch("http://$IP/...")
+          - pattern: |
+              http.get("http://$IP/...")
+          - pattern: |
+              request("http://$IP/...")
+          - pattern: |
+              axios.get("http://$IP/...")
+      - metavariable-regex:
+          metavariable: $IP
+          regex: "^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}"
+    message: "Hardcoded IP address in HTTP request — possible C2 beacon or data exfiltration"
+    severity: WARNING
+    languages:
+      - javascript
+      - typescript
+      - python
+      - go
+      - java
+      - ruby
+
+  - id: lockedcode.network-suspicious.url-concatenation
+    pattern-either:
+      - pattern: |
+          "https://" + $X + "/api"
+      - pattern: |
+          "http://" + $X + "/api"
+      - pattern: |
+          "https://" + $X
+      - pattern: |
+          "http://" + $Y + $Z
+    message: "URL construction via string concatenation — possible dynamic redirection"
+    severity: WARNING
+    languages:
+      - javascript
+      - typescript
+      - python
+      - go
+      - java
+      - ruby
+      - php
+
+  - id: lockedcode.network-suspicious.non-standard-port
+    patterns:
+      - pattern-either:
+          - pattern: |
+              fetch("...:$PORT/...")
+          - pattern: |
+              http.get("...:$PORT/...")
+      - metavariable-regex:
+          metavariable: $PORT
+          regex: "^[2-9]\\d{3,4}$"
+    message: "HTTP request to non-standard port — possible custom C2 channel"
+    severity: WARNING
+    languages:
+      - javascript
+      - typescript
+      - python
+      - go
+
+  - id: lockedcode.network-suspicious.raw-socket
+    pattern-either:
+      - pattern: |
+          new WebSocket("ws://...")
+      - pattern: |
+          new WebSocket("wss://...")
+      - pattern: |
+          net.connect(...)
+      - pattern: |
+          socket.connect(...)
+    message: "Raw socket or WebSocket connection — review for legitimate use"
+    severity: INFO
+    languages:
+      - javascript
+      - typescript
+      - python
+      - go

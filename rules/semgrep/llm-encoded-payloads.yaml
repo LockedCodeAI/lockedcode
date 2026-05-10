@@ -1,0 +1,74 @@
+rules:
+  - id: lockedcode.encoded-payloads.base64-string-literal
+    patterns:
+      - pattern-either:
+          - pattern: |
+              $X = "..."
+          - pattern: |
+              $X = '...'
+      - metavariable-regex:
+          metavariable: $X
+          regex: "^[A-Za-z0-9+/]{50,}={0,2}$"
+    message: "Base64-encoded string literal detected — possible encoded payload or data exfiltration"
+    severity: WARNING
+    languages:
+      - javascript
+      - typescript
+      - python
+      - go
+      - java
+      - ruby
+      - rust
+
+  - id: lockedcode.encoded-payloads.base64-decode-call
+    pattern-either:
+      - pattern: |
+          atob(...)
+      - pattern: |
+          Buffer.from(..., "base64")
+      - pattern: |
+          base64.b64decode(...)
+      - pattern: |
+          base64_decode(...)
+    message: "Base64 decode function call — verify the decoded content is safe"
+    severity: INFO
+    languages:
+      - javascript
+      - typescript
+      - python
+      - go
+      - java
+      - ruby
+
+  - id: lockedcode.encoded-payloads.hex-string-literal
+    patterns:
+      - pattern-either:
+          - pattern: |
+              $X = "..."
+      - metavariable-regex:
+          metavariable: $X
+          regex: "^[0-9a-fA-F]{40,}$"
+    message: "Hex-encoded string literal — possible obfuscated payload"
+    severity: WARNING
+    languages:
+      - javascript
+      - typescript
+      - python
+      - go
+      - ruby
+
+  - id: lockedcode.encoded-payloads.multi-layer-encoding
+    pattern-either:
+      - pattern: |
+          atob(btoa(...))
+      - pattern: |
+          base64_decode(hex_decode(...))
+      - pattern: |
+          base64_decode(unhex(...))
+    message: "Multi-layer encoding detected — possible obfuscation attempt"
+    severity: ERROR
+    languages:
+      - javascript
+      - typescript
+      - python
+      - go

@@ -11,9 +11,10 @@ import { Service as SecurityConfigService, defaultLayer as configLayer } from ".
 import { defaultSecurityConfig } from "../types"
 
 // Test layers for subsystem-only tests (no Bus dependency)
+// Test layers for subsystem-only tests (no Bus dependency)
 const subsystemLayer = Layer.mergeAll(
   Security.defaultLayer,
-  scanningLayer,
+  configLayer,
   dlpLayer,
   auditLayer,
   policyLayer,
@@ -26,7 +27,7 @@ describe("SecurityService", () => {
   // SecurityService needs Bus which needs InstanceState — use instance test
   // For skeleton tests, verify the service interface works with a minimal layer
   const it = testEffect(Layer.mergeAll(Security.defaultLayer))
-  const minLayer = Layer.mergeAll(Security.defaultLayer, scanningLayer, dlpLayer, auditLayer, policyLayer, trustLayer)
+  const minLayer = Layer.mergeAll(Security.defaultLayer, configLayer, dlpLayer, auditLayer, policyLayer, trustLayer)
   const itMin = testEffect(minLayer)
 
   itMin.effect("can be instantiated via its Effect Layer", () =>
@@ -97,8 +98,9 @@ describe("Subsystem Stubs", () => {
   subsystem.effect("ScanningService can be instantiated", () =>
     Effect.gen(function* () {
       const svc = yield* ScanningService
-      const result = yield* svc.scan("content", {})
-      expect(result.scanner).toBe("stub")
+      const result = yield* svc.scan("test content", { operation: "write" })
+      expect(result.scanner).toBeDefined()
+      expect(result.severity).toBe("info")
     }),
   )
 

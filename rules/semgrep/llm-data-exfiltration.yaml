@@ -1,0 +1,66 @@
+rules:
+  - id: lockedcode.data-exfiltration.env-to-http
+    patterns:
+      - pattern-either:
+          - pattern: |
+              $BODY = process.env
+          - pattern: |
+              $BODY = os.environ
+      - pattern-not: |
+          $BODY = process.env.NODE_ENV
+      - pattern-inside: |
+          function ...(...) {
+            ...
+            fetch(..., { body: $BODY })
+            ...
+          }
+    message: "Environment variables being sent in HTTP request body — possible credential exfiltration"
+    severity: ERROR
+    languages:
+      - javascript
+      - typescript
+      - python
+
+  - id: lockedcode.data-exfiltration.credential-file-read
+    patterns:
+      - pattern-either:
+          - pattern: |
+              fs.readFileSync("~/.ssh/...")
+          - pattern: |
+              fs.readFileSync("~/.aws/...")
+          - pattern: |
+              fs.readFileSync(".env")
+          - pattern: |
+              open(".env")
+          - pattern: |
+              read(".env")
+      - pattern-inside: |
+          function ...(...) {
+            ...
+            fetch(...)
+            ...
+          }
+    message: "Reading credential files and making network call in same function — possible data exfiltration"
+    severity: ERROR
+    languages:
+      - javascript
+      - typescript
+      - python
+      - go
+      - ruby
+
+  - id: lockedcode.data-exfiltration.env-in-request-body
+    patterns:
+      - pattern-either:
+          - pattern: |
+              JSON.stringify(process.env)
+          - pattern: |
+              JSON.stringify(os.environ)
+      - pattern-inside: |
+          fetch(..., { body: ... })
+    message: "Environment variables serialized into request body — possible credential exfiltration"
+    severity: ERROR
+    languages:
+      - javascript
+      - typescript
+      - python
