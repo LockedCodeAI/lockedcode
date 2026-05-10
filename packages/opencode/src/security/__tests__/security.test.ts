@@ -139,7 +139,8 @@ describe("Subsystem Stubs", () => {
     Effect.gen(function* () {
       const svc = yield* TrustService
       const result = yield* svc.score({ action: "shell", context: {} })
-      expect(result.riskLevel).toBe("low")
+      expect(result.riskLevel).toBe("medium")
+      expect(result.score).toBeGreaterThanOrEqual(20)
     }),
   )
 })

@@ -140,6 +140,7 @@ export interface TrustScore {
   readonly score: number
   readonly riskLevel: "low" | "medium" | "high" | "critical"
   readonly factors: string[]
+  readonly action?: "auto_approve" | "notify" | "prompt" | "block"
 }
 
 /**
