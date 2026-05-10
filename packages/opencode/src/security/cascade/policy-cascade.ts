@@ -18,9 +18,9 @@ export function inheritPolicy(parent: Policy, child?: Partial<Policy>): Policy {
 
   if (child.security?.strictness && childIdx !== -1 && childIdx < parentIdx) {
     // Child requested less restrictive — override to parent's level
-    result.security.strictness = parent.security.strictness
+    ;(result.security as any).strictness = parent.security.strictness
   } else if (child.security?.strictness && childIdx !== -1) {
-    result.security.strictness = child.security.strictness
+    ;(result.security as any).strictness = child.security.strictness
   }
 
   // Confinement: child inherits parent boundary, cannot widen

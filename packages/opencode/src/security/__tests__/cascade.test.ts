@@ -45,20 +45,20 @@ describe("policy inheritance", () => {
 
   test("child cannot escalate: parent=strict, child=permissive → child gets strict", () => {
     const parent: Policy = { ...defaultPolicy, security: { ...defaultPolicy.security, strictness: "strict" } }
-    const child = inheritPolicy(parent, { security: { strictness: "permissive" as const } })
+    const child = inheritPolicy(parent, { security: { strictness: "permissive" as const } } as Partial<Policy>)
     expect(child.security.strictness).toBe("strict")
   })
 
   test("child can be more restrictive: parent=permissive, child=strict → child gets strict", () => {
     const parent: Policy = { ...defaultPolicy, security: { ...defaultPolicy.security, strictness: "permissive" as const } }
-    const child = inheritPolicy(parent, { security: { strictness: "strict" as const } })
+    const child = inheritPolicy(parent, { security: { strictness: "strict" as const } } as Partial<Policy>)
     expect(child.security.strictness).toBe("strict")
   })
 
   test("child cannot add pre-approved paths", () => {
     const child = inheritPolicy(defaultPolicy, {
       security: { confinement: { preApprovedPaths: ["/tmp", "/custom/path"] } },
-    })
+    } as Partial<Policy>)
     expect(child.security.confinement.preApprovedPaths).not.toContain("/custom/path")
     expect(child.security.confinement.preApprovedPaths).toContain("/tmp")
   })
@@ -66,33 +66,30 @@ describe("policy inheritance", () => {
   test("child can remove pre-approved paths", () => {
     const child = inheritPolicy(defaultPolicy, {
       security: { confinement: { preApprovedPaths: [] } },
-    })
+    } as unknown as Partial<Policy>)
     expect(child.security.confinement.preApprovedPaths.length).toBe(0)
   })
 
   test("child cannot lower trust thresholds to less restrictive", () => {
     const child = inheritPolicy(defaultPolicy, {
       security: { trust: { autoApproveBelow: 30, promptAbove: 40, blockAbove: 80 } },
-    })
-    // Child requested raise autoApprove from 20 to 30 — should be capped at 20
+    } as Partial<Policy>)
     expect(child.security.trust.autoApproveBelow).toBe(20)
-    // Child requested lower promptAbove from 50 to 40 — more restrictive, allowed
     expect(child.security.trust.promptAbove).toBe(50)
-    // Child requested lower blockAbove from 90 to 80 — more restrictive, allowed
     expect(child.security.trust.blockAbove).toBe(80)
   })
 
   test("child cannot disable scanners parent has enabled", () => {
     const child = inheritPolicy(defaultPolicy, {
       security: { scanning: { semgrep: { enabled: false, timeout: 30 }, yara: { enabled: true, timeout: 15 }, injection: { enabled: true, sensitivity: "medium" } } },
-    })
+    } as Partial<Policy>)
     expect(child.security.scanning.semgrep.enabled).toBe(true)
   })
 
   test("child cannot disable DLP if parent has it enabled", () => {
     const child = inheritPolicy(defaultPolicy, {
       security: { dlp: { enabled: false } },
-    })
+    } as Partial<Policy>)
     expect(child.security.dlp.enabled).toBe(true)
   })
 })

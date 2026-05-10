@@ -52,7 +52,7 @@ export function getParentChain(agentId: string): string[] {
   let current = registry.get(agentId)
   while (current) {
     chain.push(current.agentId)
-    current = current.parentAgentId ? registry.get(current.parentAgentId) ?? null : null
+    current = current.parentAgentId ? (registry.get(current.parentAgentId) ?? undefined) : undefined
   }
   return chain
 }
