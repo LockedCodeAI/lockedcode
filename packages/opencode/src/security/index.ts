@@ -78,7 +78,8 @@ export const layer = Layer.effect(
         toolName: metadata.toolName as string ?? metadata.toolCallID as string,
         operation: "write",
       }
-      return yield* scanning.scan(content, scanMeta)
+      const result = yield* scanning.scan(content, scanMeta)
+      return result
     })
 
     // scanCommand in layer — uses analyzeCommand + scanning
