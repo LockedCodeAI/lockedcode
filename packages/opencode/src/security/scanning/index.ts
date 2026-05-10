@@ -8,6 +8,7 @@ import { YaraScanner } from "./yara"
 import { EntropyScanner } from "./entropy"
 import { SecretScanner } from "../secrets"
 import { InjectionScanner } from "../injection"
+import { CustomScanner } from "../rules/custom-scanner"
 
 const log = Log.create({ service: "scanning" })
 
@@ -75,6 +76,10 @@ export const layer = Layer.effect(
     // Register Injection scanner
     const injection = yield* InjectionScanner(defaultSecurityConfig.injection)
     scanners.push(injection)
+
+    // Register Custom scanner
+    const custom = yield* CustomScanner()
+    scanners.push(custom)
 
     let noScannerWarning = false
 

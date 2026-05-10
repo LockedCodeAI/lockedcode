@@ -1,0 +1,48 @@
+{
+  "rules": [
+    {
+      "id": "compliance-pci-card-number",
+      "name": "PCI-DSS: Credit card number in code",
+      "type": "content",
+      "pattern": "\\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13})\\b",
+      "flags": "",
+      "severity": "critical",
+      "languages": ["javascript", "typescript", "python", "go", "java", "ruby"],
+      "description": "Credit card numbers must not be hardcoded in source code",
+      "remediation": "Use a vault or secrets manager for payment credentials",
+      "tags": ["compliance", "pci-dss"],
+      "testCases": {
+        "shouldMatch": [
+          "4111111111111111",
+          "5555555555554444",
+          "378282246310005"
+        ],
+        "shouldNotMatch": [
+          "1234567890123456",
+          "const card = getPaymentMethod()"
+        ]
+      }
+    },
+    {
+      "id": "compliance-no-hardcoded-tokens",
+      "name": "No hardcoded JWT tokens",
+      "type": "content",
+      "pattern": "eyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}",
+      "flags": "",
+      "severity": "high",
+      "languages": [],
+      "description": "JWT tokens must not be hardcoded in source code",
+      "remediation": "Use environment variables or a token service",
+      "tags": ["compliance", "security"],
+      "testCases": {
+        "shouldMatch": [
+          "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dGVzdHNpZ25hdHVyZQ"
+        ],
+        "shouldNotMatch": [
+          "const token = getAuthToken()",
+          "const jwt = env.JWT_SECRET"
+        ]
+      }
+    }
+  ]
+}

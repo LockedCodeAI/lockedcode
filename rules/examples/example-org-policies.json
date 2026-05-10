@@ -1,0 +1,46 @@
+{
+  "rules": [
+    {
+      "id": "org-no-internal-api-calls",
+      "name": "Block internal API endpoint references",
+      "type": "content",
+      "pattern": "https://internal\\.corp\\.example\\.com",
+      "flags": "i",
+      "severity": "high",
+      "languages": ["javascript", "typescript", "python"],
+      "description": "Generated code must not reference internal API endpoints",
+      "remediation": "Replace with environment variable reference",
+      "tags": ["org-policy", "data-leak"],
+      "testCases": {
+        "shouldMatch": [
+          "fetch('https://internal.corp.example.com/api/users')"
+        ],
+        "shouldNotMatch": [
+          "fetch('https://api.example.com/public')",
+          "const url = process.env.API_URL"
+        ]
+      }
+    },
+    {
+      "id": "org-require-auth-header",
+      "name": "Require auth header in API calls",
+      "type": "content",
+      "pattern": "fetch\\(.*api\\.example\\.com\\)",
+      "flags": "",
+      "severity": "warning",
+      "languages": ["javascript", "typescript"],
+      "description": "API calls to example.com must use authorization headers",
+      "remediation": "Add an Authorization header to the request",
+      "tags": ["org-policy", "best-practice"],
+      "testCases": {
+        "shouldMatch": [
+          "fetch('https://api.example.com/users')"
+        ],
+        "shouldNotMatch": [
+          "fetch('https://internal.corp.example.com')",
+          "const url = 'https://other.com/api'"
+        ]
+      }
+    }
+  ]
+}
