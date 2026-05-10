@@ -4,9 +4,23 @@ import { NamedError } from "@opencode-ai/core/util/error"
 import { logo as glyphs } from "./logo"
 
 const wordmark = [
-  "  ╔══════════════════════════════════════╗",
-  "  ║   LockedCode · Secure Agentic Coding ║",
-  "  ╚══════════════════════════════════════╝",
+  "             █████████████",
+  "             ██         ██",
+  "             ██         ██",
+  "             ██         ██",
+  "    ███████████████████████████████",
+  "    ██                           ██",
+  "    ██    L O C K E D C O D E    ██",
+  "    ██    ───────────────────    ██",
+  "    ██   Secure Agentic Coding   ██",
+  "    ██                           ██",
+  "    ██           ▄███▄           ██",
+  "    ██          ███████          ██",
+  "    ██           ▀███▀           ██",
+  "    ██            ███            ██",
+  "    ██            ███            ██",
+  "    ██                           ██",
+  "    ███████████████████████████████",
 ]
 
 export const CancelledError = NamedError.create("UICancelledError", z.void())
