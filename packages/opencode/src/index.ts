@@ -8,7 +8,7 @@ import { ProvidersCommand } from "./cli/cmd/providers"
 import { AgentCommand } from "./cli/cmd/agent"
 import { UpgradeCommand } from "./cli/cmd/upgrade"
 import { UninstallCommand } from "./cli/cmd/uninstall"
-import { ModelsCommand } from "./cli/cmd/models"
+import { ModelsListCommand, ModelsApproveCommand, ModelsBlockCommand, ModelsReportCommand } from "./cli/cmd/models"
 import { UI } from "./cli/ui"
 import { Installation } from "./installation"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
@@ -171,19 +171,10 @@ const cli = yargs(args)
   .command(UninstallCommand)
   .command(ServeCommand)
   .command(WebCommand)
-  .command(ModelsCommand)
-  .command(StatsCommand)
-  .command(ExportCommand)
-  .command(ImportCommand)
-  .command(GithubCommand)
-  .command(PrCommand)
-  .command(SessionCommand)
-  .command(PluginCommand)
-  .command(DbCommand)
-  .command(SecurityCheckCommand)
-  .command(RulesListCommand)
-  .command(RulesTestCommand)
-  .command(ProvenanceCommand)
+  .command(ModelsListCommand)
+  .command(ModelsApproveCommand)
+  .command(ModelsBlockCommand)
+  .command(ModelsReportCommand)
   .fail((msg, err) => {
     if (
       msg?.startsWith("Unknown argument") ||

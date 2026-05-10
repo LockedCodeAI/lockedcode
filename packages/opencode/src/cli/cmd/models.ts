@@ -1,66 +1,181 @@
-import { EOL } from "os"
-import { Effect } from "effect"
-import { Provider } from "@/provider/provider"
-import { ProviderID } from "../../provider/schema"
-import { ModelsDev } from "@/provider/models"
-import { effectCmd, fail } from "../effect-cmd"
-import { UI } from "../ui"
+import type { CommandModule } from "yargs"
+import path from "path"
+import fs from "fs"
+import { execFileSync } from "child_process"
 
-export const ModelsCommand = effectCmd({
-  command: "models [provider]",
-  describe: "list all available models",
-  builder: (yargs) =>
-    yargs
-      .positional("provider", {
-        describe: "provider ID to filter models by",
-        type: "string",
-        array: false,
-      })
-      .option("verbose", {
-        describe: "use more verbose model output (includes metadata like costs)",
-        type: "boolean",
-      })
-      .option("refresh", {
-        describe: "refresh the models cache from models.dev",
-        type: "boolean",
-      }),
-  handler: Effect.fn("Cli.models")(function* (args) {
-    if (args.refresh) {
-      yield* ModelsDev.Service.use((s) => s.refresh(true))
-      UI.println(UI.Style.TEXT_SUCCESS_BOLD + "Models cache refreshed" + UI.Style.TEXT_NORMAL)
-    }
+type ListArgs = {}
+type ApproveArgs = { modelId: string; reason?: string }
+type BlockArgs = { modelId: string; reason?: string }
+type ReportArgs = { modelId?: string }
 
-    const provider = yield* Provider.Service
-    const providers = yield* provider.list()
+const DB_PATH = path.join(require("os").homedir(), ".local", "share", "lockedcode", "opencode-local.db")
 
-    const print = (providerID: ProviderID, verbose?: boolean) => {
-      const p = providers[providerID]
-      const sorted = Object.entries(p.models).sort(([a], [b]) => a.localeCompare(b))
-      for (const [modelID, model] of sorted) {
-        process.stdout.write(`${providerID}/${modelID}`)
-        process.stdout.write(EOL)
-        if (verbose) {
-          process.stdout.write(JSON.stringify(model, null, 2))
-          process.stdout.write(EOL)
-        }
-      }
-    }
+function query(sql: string): any[] {
+  try {
+    if (!fs.existsSync(DB_PATH)) return []
+    const result = execFileSync("sqlite3", ["-json", DB_PATH, sql], { encoding: "utf-8", maxBuffer: 1024 * 1024 })
+    return JSON.parse(result || "[]")
+  } catch {
+    return []
+  }
+}
 
-    if (args.provider) {
-      const providerID = ProviderID.make(args.provider)
-      if (!providers[providerID]) return yield* fail(`Provider not found: ${args.provider}`)
-      print(providerID, args.verbose)
+function run(sql: string): void {
+  try {
+    if (!fs.existsSync(DB_PATH)) return
+    execFileSync("sqlite3", [DB_PATH, sql], { encoding: "utf-8" })
+  } catch {}
+}
+
+function formatDate(ts: number): string {
+  if (!ts) return "never"
+  return new Date(ts).toISOString().replace("T", " ").slice(0, 16)
+}
+
+export const ModelsListCommand = {
+  command: "models list",
+  builder: (yargs: any) => yargs,
+  handler: async () => {
+    const models = query("SELECT * FROM model_registry ORDER BY last_seen DESC")
+
+    if (models.length === 0) {
+      console.log("\nNo models registered yet. Run an agent session to populate.")
       return
     }
 
-    const ids = Object.keys(providers).sort((a, b) => {
-      const aIsOpencode = a.startsWith("opencode")
-      const bIsOpencode = b.startsWith("opencode")
-      if (aIsOpencode && !bIsOpencode) return -1
-      if (!aIsOpencode && bIsOpencode) return 1
-      return a.localeCompare(b)
-    })
+    console.log("\nModel Registry")
+    console.log("═".repeat(55))
+    console.log()
 
-    for (const providerID of ids) print(ProviderID.make(providerID), args.verbose)
-  }),
-})
+    let approved = 0, blocked = 0, unknown = 0, pending = 0
+
+    for (const m of models) {
+      const trust = query(`SELECT * FROM model_trust WHERE model_id = '${m.model_id}'`)[0]
+      const provenance = query(`SELECT COUNT(*) as total, file_path FROM file_provenance WHERE model_id = '${m.model_id}' GROUP BY file_path`)
+
+      const flagRate = trust ? ((trust.flagged_actions / Math.max(trust.total_actions, 1)) * 100).toFixed(1) : "?"
+      const files = provenance ? provenance.length : "?"
+      const status = m.status
+
+      if (status === "approved") approved++
+      else if (status === "blocked") blocked++
+      else if (status === "pending") pending++
+      else unknown++
+
+      const statusIcon = status === "approved" ? "✓" : status === "blocked" ? "✗" : "?"
+      console.log(`  ${statusIcon} ${m.model_id.padEnd(28)} ${status} (${m.added_by})`)
+      if (m.reason) console.log(`    Reason: ${m.reason}`)
+      console.log(`    Trust: ${trust?.average_score?.toFixed(1) ?? "?"} avg | Flag rate: ${flagRate}% | Sessions: ${m.session_count} | Files: ${files}`)
+      console.log(`    Last used: ${formatDate(m.last_seen)}`)
+      console.log()
+    }
+
+    console.log(`${models.length} models registered (${approved} approved, ${blocked} blocked, ${unknown} unknown, ${pending} pending)`)
+  },
+} satisfies CommandModule<object, ListArgs>
+
+export const ModelsApproveCommand = {
+  command: "models approve <modelId>",
+  builder: (yargs: any) =>
+    yargs
+      .positional("modelId", { describe: "Model ID to approve", type: "string" })
+      .option("reason", { describe: "Approval reason", type: "string" }),
+  handler: async (args: any) => {
+    const modelId = args.modelId as string
+    const reason = args.reason as string | undefined
+
+    run(`INSERT INTO model_registry (model_id, status, added_by, reason, first_seen, last_seen, session_count, time_created, time_updated)
+      VALUES ('${modelId}', 'approved', 'cli', ${reason ? `'${reason}'` : "NULL"}, ${Date.now()}, ${Date.now()}, 0, ${Date.now()}, ${Date.now()})
+      ON CONFLICT(model_id) DO UPDATE SET status = 'approved', added_by = 'cli', reason = ${reason ? `'${reason}'` : "NULL"}, time_updated = ${Date.now()}`)
+
+    console.log(`\n✓ Model "${modelId}" approved.${reason ? ` Reason: ${reason}` : ""}\n`)
+  },
+} satisfies CommandModule<object, ApproveArgs>
+
+export const ModelsBlockCommand = {
+  command: "models block <modelId>",
+  builder: (yargs: any) =>
+    yargs
+      .positional("modelId", { describe: "Model ID to block", type: "string" })
+      .option("reason", { describe: "Block reason", type: "string" }),
+  handler: async (args: any) => {
+    const modelId = args.modelId as string
+    const reason = args.reason as string | undefined
+
+    run(`INSERT INTO model_registry (model_id, status, added_by, reason, first_seen, last_seen, session_count, time_created, time_updated)
+      VALUES ('${modelId}', 'blocked', 'cli', ${reason ? `'${reason}'` : "NULL"}, ${Date.now()}, ${Date.now()}, 0, ${Date.now()}, ${Date.now()})
+      ON CONFLICT(model_id) DO UPDATE SET status = 'blocked', added_by = 'cli', reason = ${reason ? `'${reason}'` : "NULL"}, time_updated = ${Date.now()}`)
+
+    console.log(`\n✗ Model "${modelId}" blocked.${reason ? ` Reason: ${reason}` : ""}\n`)
+  },
+} satisfies CommandModule<object, BlockArgs>
+
+export const ModelsReportCommand = {
+  command: "models report [modelId]",
+  builder: (yargs: any) =>
+    yargs.positional("modelId", { describe: "Model ID for detailed report", type: "string" }),
+  handler: async (args: any) => {
+    const modelId = args.modelId as string | undefined
+
+    if (modelId) {
+      const m = query(`SELECT * FROM model_registry WHERE model_id = '${modelId}'`)[0]
+      if (!m) {
+        console.log(`\nModel "${modelId}" not found in registry.\n`)
+        return
+      }
+      const trust = query(`SELECT * FROM model_trust WHERE model_id = '${modelId}'`)[0]
+      const provenance = query(`SELECT operation, COUNT(*) as cnt FROM file_provenance WHERE model_id = '${modelId}' GROUP BY operation`)
+      const files = query(`SELECT COUNT(DISTINCT file_path) as cnt FROM file_provenance WHERE model_id = '${modelId}'`)[0]
+
+      console.log(`\nModel Report: ${modelId}`)
+      console.log("═".repeat(Math.min(55, modelId.length + 16)))
+      console.log()
+      console.log(`  Status:        ${m.status} (${m.added_by})`)
+      if (m.reason) console.log(`  Reason:        ${m.reason}`)
+      console.log(`  First seen:    ${formatDate(m.first_seen)}`)
+      console.log(`  Last seen:     ${formatDate(m.last_seen)}`)
+      console.log(`  Sessions:      ${m.session_count}`)
+      console.log()
+
+      if (trust) {
+        const flagRate = ((trust.flagged_actions / Math.max(trust.total_actions, 1)) * 100).toFixed(1)
+        console.log(`  Trust Profile:`)
+        console.log(`    Total actions: ${trust.total_actions}`)
+        console.log(`    Flagged:       ${trust.flagged_actions} (${flagRate}%)`)
+        console.log(`    Blocked:       ${trust.blocked_actions}`)
+        console.log(`    Average score: ${trust.average_score?.toFixed(1)}`)
+        console.log()
+      }
+
+      console.log(`  Provenance:`)
+      for (const p of provenance) {
+        console.log(`    ${p.operation}: ${p.cnt}`)
+      }
+      console.log(`    Total files:  ${files?.cnt ?? 0}`)
+      console.log()
+    } else {
+      const rows = query(`SELECT m.*, t.flagged_actions, t.total_actions,
+        (SELECT COUNT(*) FROM file_provenance WHERE model_id = m.model_id) as total_ops
+        FROM model_registry m LEFT JOIN model_trust t ON m.model_id = t.model_id
+        ORDER BY m.last_seen DESC`)
+
+      if (rows.length === 0) {
+        console.log("\nNo models registered yet.\n")
+        return
+      }
+
+      console.log("\nModel Registry Report")
+      console.log("═".repeat(55))
+      console.log()
+
+      for (const r of rows) {
+        const flagRate = r.total_actions ? ((r.flagged_actions / r.total_actions) * 100).toFixed(1) : "?"
+        const icon = r.status === "approved" ? "✓" : r.status === "blocked" ? "✗" : "?"
+        console.log(`  ${icon} ${r.model_id}`)
+        console.log(`     Status: ${r.status} (${r.added_by}) | Sessions: ${r.session_count} | Ops: ${r.total_ops ?? 0} | Flags: ${flagRate}%`)
+        console.log(`     Last: ${formatDate(r.last_seen)}`)
+        console.log()
+      }
+    }
+  },
+} satisfies CommandModule<object, ReportArgs>
