@@ -1010,19 +1010,15 @@ export function Prompt(props: PromptProps) {
     }
     if (props.disabled) return false
     if (workspaceCreating()) return false
-    // Check for exit commands before autocomplete to allow /quit to work
-    const trimmed = (input?.plainText ?? store.prompt.input).trim()
-    if (trimmed === "exit" || trimmed === "quit" || trimmed === ":q" || trimmed === "/exit" || trimmed === "/quit" || trimmed === "/q") {
-      exit()
-      setTimeout(() => process.exit(0), 100)
-      return true
-    }
-    if (props.disabled) return false
-    if (workspaceCreating()) return false
     if (auto()?.visible) return false
     if (!store.prompt.input) return false
     const agent = local.agent.current()
     if (!agent) return false
+    const trimmed = store.prompt.input.trim()
+    if (trimmed === "exit" || trimmed === "quit" || trimmed === ":q") {
+      void exit()
+      return true
+    }
     const selectedModel = local.model.current()
     if (!selectedModel) {
       void promptModelWarning()
