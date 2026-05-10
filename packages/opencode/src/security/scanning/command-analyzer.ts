@@ -1,6 +1,7 @@
 import type { ScanFinding, Severity } from "../types"
 import { parseCommand, isSensitiveVar, isNetworkCommand } from "./command-parser"
 import type { ParsedCommand } from "./command-parser"
+import { analyzeDependencies } from "../dependency/analyzer"
 
 /**
  * Analyze a shell command for security issues.
@@ -22,6 +23,12 @@ export function analyzeCommand(command: string): {
   findings.push(...checkMediumRisk(parsed))
   findings.push(...checkPaths(parsed))
   findings.push(...checkEnvVars(parsed, command))
+
+  // Run dependency analysis for install commands
+  const depResult = analyzeDependencies(command)
+  if (depResult.isInstallCommand) {
+    findings.push(...depResult.findings)
+  }
 
   // Calculate score
   for (const f of findings) {
