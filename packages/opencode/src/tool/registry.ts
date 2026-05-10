@@ -33,7 +33,7 @@ import { ApplyPatchTool } from "./apply_patch"
 import { Glob } from "@opencode-ai/core/util/glob"
 import path from "path"
 import { pathToFileURL } from "url"
-import { Effect, Layer, Context } from "effect"
+import { Effect, Layer, Context, Option } from "effect"
 import { FetchHttpClient, HttpClient } from "effect/unstable/http"
 import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
@@ -50,6 +50,7 @@ import { Agent } from "../agent/agent"
 import { Git } from "@/git"
 import { Skill } from "../skill"
 import { Permission } from "@/permission"
+import { Security } from "@/security"
 
 const log = Log.create({ service: "tool.registry" })
 
@@ -323,6 +324,43 @@ export const layer: Layer.Layer<
             parameters: tool.parameters,
           }
           yield* plugin.trigger("tool.definition", { toolID: tool.id }, output)
+
+          // Wrap tool execution with SecurityService interception.
+          // Uses Effect.serviceOption so security is optional — no required dependency.
+          const originalExecute = tool.execute
+          const executeOpt = Option.getOrUndefined(yield* Effect.serviceOption(Security.Service)) as Security.Interface | undefined
+          const execute = executeOpt
+            ? (args: unknown, ctx: Tool.Context<Record<string, unknown>>) =>
+                Effect.gen(function* () {
+                  yield* executeOpt.evaluatePolicy(tool.id, {
+                    sessionID: ctx.sessionID,
+                    messageID: ctx.messageID,
+                    agent: ctx.agent,
+                  })
+                  if (tool.id === "write" || tool.id === "edit" || tool.id === "patch") {
+                    const content = typeof args === "object" && args !== null ? JSON.stringify(args) : String(args)
+                    yield* executeOpt.scanContent(content, { sessionID: ctx.sessionID, toolCallID: ctx.callID })
+                  }
+                  if (tool.id === "shell") {
+                    const command = typeof args === "object" && args !== null
+                      ? String((args as Record<string, unknown>).command ?? "")
+                      : String(args)
+                    yield* executeOpt.scanCommand(command, { sessionID: ctx.sessionID, toolCallID: ctx.callID })
+                  }
+                  const result = yield* originalExecute(args, ctx)
+                  yield* executeOpt.recordAuditEvent({
+                    eventType: "security.action_approved",
+                    sessionId: ctx.sessionID,
+                    timestamp: Date.now(),
+                    toolName: tool.id,
+                    modelId: ctx.agent,
+                    actionTaken: "allowed",
+                    details: { title: result.title },
+                  })
+                  return result
+                }).pipe(Effect.orDie) as Effect.Effect<Tool.ExecuteResult>
+            : originalExecute
+
           return {
             id: tool.id,
             description: [
@@ -333,7 +371,7 @@ export const layer: Layer.Layer<
               .filter(Boolean)
               .join("\n"),
             parameters: output.parameters,
-            execute: tool.execute,
+            execute,
             formatValidationError: tool.formatValidationError,
           }
         }),
@@ -364,6 +402,7 @@ export const defaultLayer = Layer.suspend(() =>
     Layer.provide(LSP.defaultLayer),
     Layer.provide(Instruction.defaultLayer),
     Layer.provide(AppFileSystem.defaultLayer),
+    Layer.provide(Security.defaultLayer),
     Layer.provide(Bus.layer),
     Layer.provide(FetchHttpClient.layer),
     Layer.provide(Format.defaultLayer),

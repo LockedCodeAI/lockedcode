@@ -57,6 +57,7 @@ import { EventV2 } from "@/v2/event"
 import { SessionEvent } from "@/v2/session-event"
 import { Modelv2 } from "@/v2/model"
 import { AgentAttachment, FileAttachment, Source } from "@/v2/session-prompt"
+import { Security } from "@/security"
 import * as DateTime from "effect/DateTime"
 import { eq } from "@/storage/db"
 import * as Database from "@/storage/db"
@@ -1571,6 +1572,23 @@ NOTE: At any point in time through this workflow you should feel free to ask the
               instruction.system().pipe(Effect.orDie),
               MessageV2.toModelMessagesEffect(msgs, model),
             ])
+
+            // Outbound context interception: scan for secrets and PII before sending to LLM.
+            // Uses Effect.serviceOption so Security is optional — no required dependency.
+            const secOpt = Option.getOrUndefined(yield* Effect.serviceOption(Security.Service))
+            if (secOpt) {
+              const textContent = modelMsgs
+                .filter((m) => m.role === "user" || m.role === "assistant")
+                .flatMap((m) => {
+                  if (typeof m.content === "string") return [m.content]
+                  if (Array.isArray(m.content)) return m.content.filter((c): c is { type: "text"; text: string } => c.type === "text").map((c) => c.text)
+                  return []
+                })
+                .join("\n")
+              if (textContent) {
+                yield* secOpt.scanOutbound(textContent, { filePath: "session-context" })
+              }
+            }
             const system = [...env, ...instructions, ...(skills ? [skills] : [])]
             const format = lastUser.format ?? { type: "text" as const }
             if (format.type === "json_schema") system.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)

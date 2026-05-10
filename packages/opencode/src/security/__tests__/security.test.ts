@@ -1,5 +1,5 @@
 import { describe, expect } from "bun:test"
-import { Effect, Layer } from "effect"
+import { Effect, Layer, Option } from "effect"
 import { testEffect } from "../../../test/lib/effect"
 import { Security } from "../index"
 import { Service as ConfinementService, defaultLayer as confinementLayer } from "../confinement"
@@ -13,6 +13,7 @@ import { defaultSecurityConfig } from "../types"
 
 // Test layers for subsystem-only tests (no Bus dependency)
 const subsystemLayer = Layer.mergeAll(
+  Security.defaultLayer,
   configLayer,
   confinementLayer,
   scanningLayer,
@@ -162,6 +163,29 @@ describe("SecurityConfig", () => {
       expect(config.scanning.enabled).toBe(true)
       expect(config.dlp.enabled).toBe(true)
       expect(config.audit.enabled).toBe(true)
+    }),
+  )
+})
+
+describe("Interception Hooks", () => {
+  // Verify that Effect.serviceOption resolves Security when layer is present
+  subsystem.effect("Security is resolvable via serviceOption when layer is present", () =>
+    Effect.gen(function* () {
+      const opt = yield* Effect.serviceOption(Security.Service)
+      expect(Option.isSome(opt)).toBe(true)
+      if (Option.isSome(opt)) {
+        const security = opt.value
+        expect(security.getStrictness()).toBe("standard")
+      }
+    }),
+  )
+
+  // Verify tool-safe pattern: serviceOption returns None when layer is absent
+  const emptyLayer = testEffect(Layer.mergeAll())
+  emptyLayer.effect("Security is not found via serviceOption when layer is absent", () =>
+    Effect.gen(function* () {
+      const opt = yield* Effect.serviceOption(Security.Service)
+      expect(Option.isNone(opt)).toBe(true)
     }),
   )
 })
