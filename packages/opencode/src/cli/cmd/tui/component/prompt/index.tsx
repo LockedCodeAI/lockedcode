@@ -1015,7 +1015,7 @@ export function Prompt(props: PromptProps) {
     const agent = local.agent.current()
     if (!agent) return false
     const trimmed = store.prompt.input.trim()
-    if (trimmed === "exit" || trimmed === "quit" || trimmed === ":q") {
+    if (trimmed === "exit" || trimmed === "quit" || trimmed === ":q" || trimmed === "/exit" || trimmed === "/quit" || trimmed === "/q") {
       void exit()
       return true
     }
