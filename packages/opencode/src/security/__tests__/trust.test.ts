@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, test, afterEach } from "bun:test"
 import { scoreAction, type ActionContext } from "../trust/scoring"
 import { determineAction, DEFAULT_THRESHOLDS } from "../trust/thresholds"
 import { getSessionDecay, applySessionDecay, recordHighRiskAction, resetSessionDecay, getSessionSummary } from "../trust/session"
