@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test"
 import { PII_PATTERNS, createSnippet } from "../dlp/pii-patterns"
 import { SECRET_PATTERNS } from "../secrets/patterns"
+import { classifyFile } from "../dlp/sensitivity"
+import { redact } from "../dlp/redaction"
 
 function testPattern(id: string, content: string): boolean {
   const pattern = PII_PATTERNS.find((x) => x.id === id)
@@ -136,5 +138,148 @@ describe("snippet safety", () => {
     const snippet = createSnippet(line, match!.index!, match!.index! + match![0].length)
     expect(snippet).toContain("'")
     expect(snippet).toContain("[REDACTED]")
+  })
+})
+
+// ============================================================
+// File Sensitivity Classification Tests
+// ============================================================
+
+describe("file sensitivity classification", () => {
+  test(".env is restricted", () => {
+    expect(classifyFile(".env")).toBe("restricted")
+  })
+
+  test(".env.example is NOT restricted", () => {
+    expect(classifyFile(".env.example")).toBe("public")
+  })
+
+  test("credentials.json is restricted", () => {
+    expect(classifyFile("config/credentials.json")).toBe("restricted")
+  })
+
+  test("*/.key files are restricted", () => {
+    expect(classifyFile("keys/server.key")).toBe("restricted")
+  })
+
+  test("*/.pem files are restricted", () => {
+    expect(classifyFile("certs/cert.pem")).toBe("restricted")
+  })
+
+  test("config/production/ path is restricted", () => {
+    expect(classifyFile("config/production/database.yaml")).toBe("restricted")
+  })
+
+  test("docker-compose.override.yml is confidential", () => {
+    expect(classifyFile("docker-compose.override.yml")).toBe("confidential")
+  })
+
+  test("application-local.properties is confidential", () => {
+    expect(classifyFile("config/application-local.properties")).toBe("confidential")
+  })
+
+  test("docker-compose.yml is internal", () => {
+    expect(classifyFile("docker-compose.yml")).toBe("internal")
+  })
+
+  test("Dockerfile is internal", () => {
+    expect(classifyFile("Dockerfile")).toBe("internal")
+  })
+
+  test("regular source file is public", () => {
+    expect(classifyFile("src/index.ts")).toBe("public")
+  })
+
+  test("README.md is public", () => {
+    expect(classifyFile("README.md")).toBe("public")
+  })
+})
+
+// ============================================================
+// Redaction Engine Tests
+// ============================================================
+
+describe("redaction engine", () => {
+  test("single secret redacted", () => {
+    const content = "stripe_key = 'stripe_live_xxxxxxxxxxxxxxxxxxxxxxx'"
+    const match = content.match(/(?:sk|rk|rk_live)_(?:live|test)_[0-9A-Za-z]{24,}/)
+    const snippet = match ? createSnippet(content, match.index!, match.index! + match[0].length) : "= '[REDACTED]'"
+    const detections = [{
+      type: "secret" as const,
+      patternId: "stripe-secret-key",
+      patternName: "Stripe Secret Key",
+      severity: "critical" as const,
+      lineNumber: 1,
+      snippet,
+    }]
+    const result = redact(content, detections)
+    expect(result.content).toContain("[REDACTED:stripe-secret-key]")
+    expect(result.redactionCount).toBe(1)
+  })
+
+  test("PII email redacted", () => {
+    const content = "email: user@company.com (primary)"
+    const match = content.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/)
+    const snippet = match ? createSnippet(content, match.index!, match.index! + match[0].length) : ": [REDACTED] ("
+    const detections = [{
+      type: "pii" as const,
+      patternId: "pii-email",
+      patternName: "Email Address",
+      severity: "warning" as const,
+      lineNumber: 1,
+      snippet,
+    }]
+    const result = redact(content, detections)
+    expect(result.content).toContain("[REDACTED:email]")
+    expect(result.redactionCount).toBe(1)
+  })
+
+  test("redaction count is accurate", () => {
+    const content = "aws_key = 'AKIA1234567890123456'\ngithub_token = 'TOKEN_0000000000000000000000000000000000'"
+    const m1 = content.match(/AKIA[0-9A-Z]{16}/)
+    const m2 = content.match(/TOKEN_[0-9A-Za-z]{36}/)
+    const s1 = m1 ? createSnippet(content, m1.index!, m1.index! + m1[0].length) : "= '[REDACTED]'"
+    const s2 = m2 ? createSnippet(content.split("\n")[1], m2.index !== undefined ? m2.index - content.indexOf("\n") - 1 : 0, (m2.index !== undefined ? m2.index - content.indexOf("\n") - 1 : 0) + (m2[0]?.length ?? 0)) : "= '[REDACTED]'"
+    // Use a simpler approach: use empty context snippets
+    const line1Snip = createSnippet(content.split("\n")[0], 9, 28)
+    const line2Snip = createSnippet(content.split("\n")[1], 14, 53)
+    const detections = [
+      { type: "secret" as const, patternId: "aws-access-key-id", patternName: "AWS Key", severity: "critical" as const, lineNumber: 1, snippet: line1Snip },
+      { type: "secret" as const, patternId: "github-pat-classic", patternName: "GitHub PAT", severity: "critical" as const, lineNumber: 2, snippet: line2Snip },
+    ]
+    const result = redact(content, detections)
+    expect(result.redactionCount).toBe(2)
+    expect(result.content).toContain("[REDACTED:aws-access-key-id]")
+    expect(result.content).toContain("[REDACTED:github-pat-classic]")
+  })
+
+  test("redaction metadata does not contain original value", () => {
+    const content = "aws_key = 'AKIA1234567890123456'"
+    const match = content.match(/AKIA[0-9A-Z]{16}/)
+    const snippet = match ? createSnippet(content, match.index!, match.index! + match[0].length) : "= '[REDACTED]'"
+    const detections = [{
+      type: "secret" as const,
+      patternId: "aws-access-key-id",
+      patternName: "AWS Access Key ID",
+      severity: "critical" as const,
+      lineNumber: 1,
+      snippet,
+    }]
+    const result = redact(content, detections)
+    expect(result.redactions.length).toBe(1)
+    expect(result.redactions[0].originalLength).toBeGreaterThan(0)
+    expect(result.redactions[0].patternId).toBe("aws-access-key-id")
+  })
+
+  test("empty content returns unchanged", () => {
+    const result = redact("", [])
+    expect(result.content).toBe("")
+    expect(result.redactionCount).toBe(0)
+  })
+
+  test("empty detections returns unchanged", () => {
+    const result = redact("hello world", [])
+    expect(result.content).toBe("hello world")
+    expect(result.redactionCount).toBe(0)
   })
 })

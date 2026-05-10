@@ -110,8 +110,9 @@ export interface ConfinementConfig {
  * Result of an outbound DLP scan.
  */
 export interface DLPResult {
-  readonly status: "clean" | "secret_detected" | "pii_detected"
+  readonly status: "clean" | "secret_detected" | "pii_detected" | "file_blocked" | "redacted"
   readonly detections: DLPDetection[]
+  readonly redactedContent?: string
 }
 
 export interface DLPDetection {
@@ -191,6 +192,8 @@ export interface DLPConfig {
   readonly enabled: boolean
   readonly scanSecrets: boolean
   readonly scanPii: boolean
+  readonly redactionMode: boolean
+  readonly blockRestrictedFiles: boolean
   readonly piiCategories: {
     readonly email: boolean
     readonly phone: boolean
@@ -234,6 +237,8 @@ export const defaultSecurityConfig: SecurityConfig = {
     enabled: true,
     scanSecrets: true,
     scanPii: true,
+    redactionMode: true,
+    blockRestrictedFiles: true,
     piiCategories: { email: true, phone: true, ssn: true, creditCard: true, ipAddress: true },
   },
   audit: { enabled: true },
