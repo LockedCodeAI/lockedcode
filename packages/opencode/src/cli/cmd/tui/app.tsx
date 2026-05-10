@@ -638,7 +638,7 @@ function App(props: { onSnapshot?: () => Promise<string[]> }) {
         name: "docs.open",
         title: "Open docs",
         run: () => {
-          open("https://opencode.ai/docs").catch(() => {})
+          open("https://lockedcode.ai/docs").catch(() => {})
           dialog.clear()
         },
         category: "System",
@@ -868,7 +868,7 @@ function App(props: { onSnapshot?: () => Promise<string[]> }) {
     await DialogAlert.show(
       dialog,
       "Update Complete",
-      `Successfully updated to OpenCode v${result.data.version}. Please restart the application.`,
+      `Successfully updated to LockedCode v${result.data.version}. Please restart the application.`,
     )
 
     void exit()

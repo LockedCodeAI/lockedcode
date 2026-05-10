@@ -76,7 +76,7 @@ function show(out: string) {
 
 const cli = yargs(args)
   .parserConfiguration({ "populate--": true })
-  .scriptName("opencode")
+  .scriptName("lockedcode")
   .wrap(100)
   .help("help", "show help")
   .alias("help", "h")
@@ -190,6 +190,13 @@ const cli = yargs(args)
   .command(QuarantineRestoreCommand)
   .command(QuarantineDiscardCommand)
   .command(MonitorStatusCommand)
+  .command(SecurityCheckCommand)
+  .command(ProvenanceCommand)
+  .command(RulesListCommand)
+  .command(RulesTestCommand)
+  .command(SessionListCommand)
+  .command(SessionReplayCommand)
+  .command(SessionExportCommand)
   .fail((msg, err) => {
     if (
       msg?.startsWith("Unknown argument") ||
