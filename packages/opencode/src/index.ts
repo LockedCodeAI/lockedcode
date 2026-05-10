@@ -9,6 +9,7 @@ import { AgentCommand } from "./cli/cmd/agent"
 import { UpgradeCommand } from "./cli/cmd/upgrade"
 import { UninstallCommand } from "./cli/cmd/uninstall"
 import { ModelsListCommand, ModelsApproveCommand, ModelsBlockCommand, ModelsReportCommand } from "./cli/cmd/models"
+import { SIEMExportCommand, SIEMStreamCommand } from "./cli/cmd/siem"
 import { UI } from "./cli/ui"
 import { Installation } from "./installation"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
@@ -175,6 +176,8 @@ const cli = yargs(args)
   .command(ModelsApproveCommand)
   .command(ModelsBlockCommand)
   .command(ModelsReportCommand)
+  .command(SIEMExportCommand)
+  .command(SIEMStreamCommand)
   .fail((msg, err) => {
     if (
       msg?.startsWith("Unknown argument") ||
