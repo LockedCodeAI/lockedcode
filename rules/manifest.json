@@ -1,0 +1,52 @@
+{
+  "version": "1.0.0",
+  "generated": "2026-05-10T00:00:00Z",
+  "rulesets": {
+    "semgrep": {
+      "count": 6,
+      "files": [
+        "semgrep/llm-encoded-payloads.yaml",
+        "semgrep/llm-code-execution.yaml",
+        "semgrep/llm-network-suspicious.yaml",
+        "semgrep/llm-data-exfiltration.yaml",
+        "semgrep/llm-persistence.yaml",
+        "semgrep/llm-crypto-mining.yaml"
+      ]
+    },
+    "yara": {
+      "count": 5,
+      "files": [
+        "yara/reverse_shells.yar",
+        "yara/web_shells.yar",
+        "yara/credential_stealers.yar",
+        "yara/crypto_miners.yar",
+        "yara/obfuscation.yar"
+      ]
+    },
+    "secrets": {
+      "count": 9,
+      "files": [
+        "secrets/cloud-providers.json",
+        "secrets/source-control.json",
+        "secrets/payment.json",
+        "secrets/communication.json",
+        "secrets/database.json",
+        "secrets/crypto-keys.json",
+        "secrets/auth-tokens.json",
+        "secrets/ai-providers.json",
+        "secrets/generic.json"
+      ]
+    },
+    "injection": {
+      "count": 6,
+      "files": [
+        "injection/role-override.json",
+        "injection/system-markers.json",
+        "injection/comment-injection.json",
+        "injection/unicode.json",
+        "injection/encoded.json",
+        "injection/metadata.json"
+      ]
+    }
+  }
+}

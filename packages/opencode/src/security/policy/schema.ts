@@ -108,6 +108,13 @@ const ModelsPolicy = z.object({
   blocked: z.array(z.string()).default([]),
 })
 
+/** Air-gap policy section. */
+const AirGapPolicy = z.object({
+  enabled: z.boolean().default(false),
+  verifyOnStartup: z.boolean().default(true),
+  allowExternalScanners: z.boolean().default(false),
+})
+
 /**
  * Complete policy document schema.
  */
@@ -139,6 +146,7 @@ export const SecuritySectionSchema = z.object({
   audit: AuditPolicy.default(() => ({ enabled: true, retentionDays: 90, logLevel: "all" as const })),
   shell: ShellPolicy.default(() => ({ additionalBlockedPatterns: [], allowedCommands: [] })),
   models: ModelsPolicy.default(() => ({ approved: [], blocked: [] })),
+  airGap: AirGapPolicy.default(() => ({ enabled: false, verifyOnStartup: true, allowExternalScanners: false })),
 })
 
 export const PolicyDocumentSchema = z.object({
@@ -157,5 +165,6 @@ export interface Policy {
     readonly audit: z.infer<typeof AuditPolicy>
     readonly shell: z.infer<typeof ShellPolicy>
     readonly models: z.infer<typeof ModelsPolicy>
+    readonly airGap: z.infer<typeof AirGapPolicy>
   }
 }

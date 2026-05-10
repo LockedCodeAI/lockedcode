@@ -6,6 +6,7 @@ import os from "os"
 import { execFileSync } from "child_process"
 import type { ScanFinding, ScanMetadata, Severity } from "../types"
 import type { Scanner } from "./scanner"
+import { resolveRulesPath } from "../rules/resolver"
 
 const log = Log.create({ service: "scanning.yara" })
 
@@ -26,21 +27,8 @@ function mapSeverity(s: string): Severity {
 }
 
 /** Resolve the YARA rules directory. */
-function resolveRulesPath(): string | null {
-  const candidates = [
-    path.join(process.cwd(), "rules", "yara"),
-    path.join(os.homedir(), ".lockedcode", "rules", "yara"),
-  ]
-  for (const dir of candidates) {
-    try {
-      if (fs.existsSync(dir) && fs.statSync(dir).isDirectory()) {
-        return dir
-      }
-    } catch {
-      continue
-    }
-  }
-  return null
+function resolveRulesPathLocal(): string | null {
+  return resolveRulesPath("yara")
 }
 
 /**
@@ -54,7 +42,7 @@ export function YaraScanner(config: {
 }): Effect.Effect<Scanner> {
   return Effect.gen(function* () {
     let available: boolean | null = null
-    const rulesDir = config.rulesPath ?? resolveRulesPath()
+    const rulesDir = config.rulesPath ?? resolveRulesPathLocal()
 
     const isAvailable = Effect.fn("Yara.isAvailable")(function* () {
       if (available !== null) return available

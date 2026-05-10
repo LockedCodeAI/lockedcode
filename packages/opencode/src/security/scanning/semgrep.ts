@@ -6,6 +6,7 @@ import os from "os"
 import { execFileSync } from "child_process"
 import type { ScanFinding, ScanMetadata, Severity } from "../types"
 import type { Scanner } from "./scanner"
+import { resolveRulesPath } from "../rules/resolver"
 
 const log = Log.create({ service: "scanning.semgrep" })
 
@@ -38,22 +39,8 @@ function mapConfidence(c: string): "low" | "medium" | "high" {
 }
 
 /** Resolve the rules directory path. */
-function resolveRulesPath(): string | null {
-  // Check bundled rules at repo root
-  const candidates = [
-    path.join(process.cwd(), "rules", "semgrep"),
-    path.join(os.homedir(), ".lockedcode", "rules", "semgrep"),
-  ]
-  for (const dir of candidates) {
-    try {
-      if (fs.existsSync(dir) && fs.statSync(dir).isDirectory()) {
-        return dir
-      }
-    } catch {
-      continue
-    }
-  }
-  return null
+function resolveRulesPathLocal(): string | null {
+  return resolveRulesPath("semgrep")
 }
 
 /**
@@ -67,7 +54,7 @@ export function SemgrepScanner(config: {
 }): Effect.Effect<Scanner> {
   return Effect.gen(function* () {
     let available: boolean | null = null
-    const rulesDir = config.rulesPath ?? resolveRulesPath()
+    const rulesDir = config.rulesPath ?? resolveRulesPathLocal()
 
     const isAvailable = Effect.fn("Semgrep.isAvailable")(function* () {
       if (available !== null) return available

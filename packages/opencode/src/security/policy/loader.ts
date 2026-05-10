@@ -35,6 +35,7 @@ export const DEFAULT_POLICY: Policy = {
     audit: { enabled: true, retentionDays: 90, logLevel: "all" },
     shell: { additionalBlockedPatterns: [], allowedCommands: [] },
     models: { approved: [], blocked: [] },
+    airGap: { enabled: false, verifyOnStartup: true, allowExternalScanners: false },
   },
 }
 
