@@ -105,10 +105,49 @@ export function detectMacOSCapabilities(): MacOSCapabilities {
   return caps as MacOSCapabilities
 }
 
+export interface WindowsCapabilities {
+  readonly isNTFS: boolean
+  readonly powershellAvailable: boolean
+  readonly icaclsAvailable: boolean
+  readonly windowsVersion: string
+}
+
+/**
+ * Detect Windows confinement capabilities.
+ */
+export function detectWindowsCapabilities(): WindowsCapabilities {
+  const caps: Record<string, any> = {
+    isNTFS: false,
+    powershellAvailable: false,
+    icaclsAvailable: false,
+    windowsVersion: "",
+  }
+
+  if (process.platform !== "win32") return caps as WindowsCapabilities
+
+  try {
+    caps.powershellAvailable = existsSync("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe")
+  } catch {}
+
+  try {
+    caps.icaclsAvailable = existsSync("C:\\Windows\\System32\\icacls.exe")
+  } catch {}
+
+  try {
+    const { execFileSync } = require("child_process")
+    const ver = execFileSync("cmd.exe", ["/c", "ver"], { encoding: "utf-8" })
+    caps.windowsVersion = ver.trim()
+  } catch {}
+
+  caps.isNTFS = true // most modern Windows installations use NTFS
+
+  return caps as WindowsCapabilities
+}
+
 /**
  * Select the best available confinement backend.
  */
-export function getBestBackend(): "landlock" | "bubblewrap" | "sandbox" | "application" {
+export function getBestBackend(): "landlock" | "bubblewrap" | "sandbox" | "ntfs-acl" | "application" {
   if (process.platform === "linux") {
     try {
       const caps = detectLinuxCapabilities()
@@ -122,6 +161,11 @@ export function getBestBackend(): "landlock" | "bubblewrap" | "sandbox" | "appli
       const caps = detectMacOSCapabilities()
       if (caps.sandboxExecAvailable) return "sandbox"
     } catch {}
+  }
+
+  if (process.platform === "win32") {
+    const caps = detectWindowsCapabilities()
+    if (caps.powershellAvailable) return "ntfs-acl"
   }
 
   return "application"
