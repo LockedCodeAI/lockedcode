@@ -1014,6 +1014,7 @@ export function Prompt(props: PromptProps) {
     const trimmed = (input?.plainText ?? store.prompt.input).trim()
     if (trimmed === "exit" || trimmed === "quit" || trimmed === ":q" || trimmed === "/exit" || trimmed === "/quit" || trimmed === "/q") {
       exit()
+      setTimeout(() => process.exit(0), 100)
       return true
     }
     if (props.disabled) return false
