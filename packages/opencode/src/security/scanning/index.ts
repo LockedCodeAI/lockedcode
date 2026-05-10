@@ -4,6 +4,8 @@ import type { ScanFinding, ScanMetadata, ScanResult, Severity, ScanningConfig, S
 import { defaultSecurityConfig } from "../types"
 import type { Scanner } from "./scanner"
 import { SemgrepScanner } from "./semgrep"
+import { YaraScanner } from "./yara"
+import { EntropyScanner } from "./entropy"
 
 const log = Log.create({ service: "scanning" })
 
@@ -52,6 +54,18 @@ export const layer = Layer.effect(
       scanners.push(semgrep)
     }
 
+    // Register YARA scanner
+    if (cfg.yara.enabled) {
+      const yara = yield* YaraScanner(cfg.yara)
+      scanners.push(yara)
+    }
+
+    // Register Entropy scanner
+    if (cfg.entropy.enabled) {
+      const entropy = yield* EntropyScanner(cfg.entropy)
+      scanners.push(entropy)
+    }
+
     let noScannerWarning = false
 
     const registerScanner = Effect.fn("Scanning.registerScanner")(function* (scanner: Scanner) {
@@ -81,7 +95,7 @@ export const layer = Layer.effect(
 
       if (available.length === 0) {
         if (!noScannerWarning) {
-          log.warn("No scanners available — install Semgrep for static analysis")
+          log.warn("No scanners available — install semgrep or yara for static analysis")
           noScannerWarning = true
         }
         return {
@@ -90,7 +104,7 @@ export const layer = Layer.effect(
           findings: [],
           ruleId: "no-scanner",
           matchedContent: "",
-          remediation: "No scanning engines available. Install semgrep to enable static analysis.",
+          remediation: "No scanning engines available. Install semgrep or yara to enable static analysis.",
           scanner: "none",
         } as ScanResult
       }

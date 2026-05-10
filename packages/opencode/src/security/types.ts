@@ -57,6 +57,16 @@ export interface ScanningConfig {
     readonly rulesPath?: string
     readonly timeout: number
   }
+  readonly yara: {
+    readonly enabled: boolean
+    readonly rulesPath?: string
+    readonly timeout: number
+  }
+  readonly entropy: {
+    readonly enabled: boolean
+    readonly threshold: number
+    readonly minStringLength: number
+  }
   readonly scanOnWrite: boolean
   readonly scanOnEdit: boolean
 }
@@ -196,6 +206,8 @@ export const defaultSecurityConfig: SecurityConfig = {
   scanning: {
     enabled: true,
     semgrep: { enabled: true, timeout: 30 },
+    yara: { enabled: true, timeout: 15 },
+    entropy: { enabled: true, threshold: 4.5, minStringLength: 20 },
     scanOnWrite: true,
     scanOnEdit: true,
   },
