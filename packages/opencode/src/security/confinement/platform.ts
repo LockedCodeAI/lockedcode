@@ -73,17 +73,56 @@ export function detectLinuxCapabilities(): LinuxCapabilities {
   return caps as LinuxCapabilities
 }
 
+export interface MacOSCapabilities {
+  readonly sandboxExecAvailable: boolean
+  readonly macOSVersion: string
+  readonly fseventsAvailable: boolean
+}
+
+/**
+ * Detect macOS confinement capabilities.
+ */
+export function detectMacOSCapabilities(): MacOSCapabilities {
+  const caps: Record<string, any> = {
+    sandboxExecAvailable: false,
+    macOSVersion: "",
+    fseventsAvailable: false,
+  }
+
+  if (process.platform !== "darwin") return caps as MacOSCapabilities
+
+  try {
+    caps.sandboxExecAvailable = existsSync("/usr/bin/sandbox-exec")
+  } catch {}
+
+  try {
+    const output = execFileSync("sw_vers", ["-productVersion"], { encoding: "utf-8" })
+    caps.macOSVersion = output.trim()
+  } catch {}
+
+  caps.fseventsAvailable = true // always available on macOS
+
+  return caps as MacOSCapabilities
+}
+
 /**
  * Select the best available confinement backend.
  */
-export function getBestBackend(): "landlock" | "bubblewrap" | "application" {
-  if (process.platform !== "linux") return "application"
+export function getBestBackend(): "landlock" | "bubblewrap" | "sandbox" | "application" {
+  if (process.platform === "linux") {
+    try {
+      const caps = detectLinuxCapabilities()
+      if (caps.landlockSupported) return "landlock"
+      if (caps.bubblewrapAvailable) return "bubblewrap"
+    } catch {}
+  }
 
-  try {
-    const caps = detectLinuxCapabilities()
-    if (caps.landlockSupported) return "landlock"
-    if (caps.bubblewrapAvailable) return "bubblewrap"
-  } catch {}
+  if (process.platform === "darwin") {
+    try {
+      const caps = detectMacOSCapabilities()
+      if (caps.sandboxExecAvailable) return "sandbox"
+    } catch {}
+  }
 
   return "application"
 }
