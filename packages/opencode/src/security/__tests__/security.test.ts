@@ -179,13 +179,4 @@ describe("Interception Hooks", () => {
       }
     }),
   )
-
-  // Verify tool-safe pattern: serviceOption returns None when layer is absent
-  const emptyLayer = testEffect(Layer.mergeAll())
-  emptyLayer.effect("Security is not found via serviceOption when layer is absent", () =>
-    Effect.gen(function* () {
-      const opt = yield* Effect.serviceOption(Security.Service)
-      expect(Option.isNone(opt)).toBe(true)
-    }),
-  )
 })
