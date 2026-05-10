@@ -872,7 +872,7 @@ export function Logo(props: { shape?: LogoShape; ink?: RGBA; idle?: boolean } = 
             </box>
             <box flexDirection="row">
               {renderLine(
-                ctx.shape.right[index()],
+                ctx.shape.right[index()] ?? "",
                 index(),
                 props.ink ?? theme.text,
                 true,
