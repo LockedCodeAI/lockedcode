@@ -55,7 +55,7 @@ export const Info = z
   })
 export type Info = z.infer<typeof Info>
 
-export const USER_AGENT = `opencode/${InstallationChannel}/${InstallationVersion}/${Flag.OPENCODE_CLIENT}`
+export const USER_AGENT = `lockedcode/${InstallationChannel}/${InstallationVersion}/${Flag.OPENCODE_CLIENT}`
 
 export function isPreview() {
   return InstallationChannel !== "latest"
@@ -134,7 +134,7 @@ export const layer: Layer.Layer<Service, never, HttpClient.HttpClient | ChildPro
       )
 
       const getBrewFormula = Effect.fnUntraced(function* () {
-        const tapFormula = yield* text(["brew", "list", "--formula", "anomalyco/tap/opencode"])
+        const tapFormula = yield* text(["brew", "list", "--formula", "LockedCodeAI/tap/lockedcode"])
         if (tapFormula.includes("lockedcode")) return "LockedCodeAI/tap/lockedcode"
         const coreFormula = yield* text(["brew", "list", "--formula", "lockedcode"])
         if (coreFormula.includes("lockedcode")) return "lockedcode"
@@ -215,7 +215,7 @@ export const layer: Layer.Layer<Service, never, HttpClient.HttpClient | ChildPro
               return info.formulae[0].versions.stable
             }
             const response = yield* httpOk.execute(
-              HttpClientRequest.get("https://formulae.brew.sh/api/formula/opencode.json").pipe(
+              HttpClientRequest.get("https://formulae.brew.sh/api/formula/lockedcode.json").pipe(
                 HttpClientRequest.acceptJson,
               ),
             )
@@ -226,7 +226,7 @@ export const layer: Layer.Layer<Service, never, HttpClient.HttpClient | ChildPro
           if (detectedMethod === "npm" || detectedMethod === "bun" || detectedMethod === "pnpm") {
             const response = yield* httpOk.execute(
               HttpClientRequest.get(
-                `${yield* NpmConfig.registry(process.cwd())}/opencode-ai/${InstallationChannel}`,
+                `${yield* NpmConfig.registry(process.cwd())}/lockedcode/${InstallationChannel}`,
               ).pipe(HttpClientRequest.acceptJson),
             )
             const data = yield* HttpClientResponse.schemaBodyJson(NpmPackage)(response)
@@ -236,7 +236,7 @@ export const layer: Layer.Layer<Service, never, HttpClient.HttpClient | ChildPro
           if (detectedMethod === "choco") {
             const response = yield* httpOk.execute(
               HttpClientRequest.get(
-                "https://community.chocolatey.org/api/v2/Packages?$filter=Id%20eq%20%27opencode%27%20and%20IsLatestVersion&$select=Version",
+                "https://community.chocolatey.org/api/v2/Packages?$filter=Id%20eq%20%27lockedcode%27%20and%20IsLatestVersion&$select=Version",
               ).pipe(HttpClientRequest.setHeaders({ Accept: "application/json;odata=verbose" })),
             )
             const data = yield* HttpClientResponse.schemaBodyJson(ChocoPackage)(response)
@@ -246,7 +246,7 @@ export const layer: Layer.Layer<Service, never, HttpClient.HttpClient | ChildPro
           if (detectedMethod === "scoop") {
             const response = yield* httpOk.execute(
               HttpClientRequest.get(
-                "https://raw.githubusercontent.com/ScoopInstaller/Main/master/bucket/opencode.json",
+                "https://raw.githubusercontent.com/ScoopInstaller/Main/master/bucket/lockedcode.json",
               ).pipe(HttpClientRequest.setHeaders({ Accept: "application/json" })),
             )
             const data = yield* HttpClientResponse.schemaBodyJson(ScoopManifest)(response)
@@ -254,7 +254,7 @@ export const layer: Layer.Layer<Service, never, HttpClient.HttpClient | ChildPro
           }
 
           const response = yield* httpOk.execute(
-            HttpClientRequest.get("https://api.github.com/repos/anomalyco/opencode/releases/latest").pipe(
+            HttpClientRequest.get("https://api.github.com/repos/LockedCodeAI/lockedcode/releases/latest").pipe(
               HttpClientRequest.acceptJson,
             ),
           )
@@ -268,24 +268,24 @@ export const layer: Layer.Layer<Service, never, HttpClient.HttpClient | ChildPro
               upgradeResult = yield* upgradeCurl(target)
               break
             case "npm":
-              upgradeResult = yield* run(["npm", "install", "-g", `opencode-ai@${target}`])
+              upgradeResult = yield* run(["npm", "install", "-g", `lockedcode@${target}`])
               break
             case "pnpm":
-              upgradeResult = yield* run(["pnpm", "install", "-g", `opencode-ai@${target}`])
+              upgradeResult = yield* run(["pnpm", "install", "-g", `lockedcode@${target}`])
               break
             case "bun":
-              upgradeResult = yield* run(["bun", "install", "-g", `opencode-ai@${target}`])
+              upgradeResult = yield* run(["bun", "install", "-g", `lockedcode@${target}`])
               break
             case "brew": {
               const formula = yield* getBrewFormula()
               const env = { HOMEBREW_NO_AUTO_UPDATE: "1" }
               if (formula.includes("/")) {
-                const tap = yield* run(["brew", "tap", "anomalyco/tap"], { env })
+                const tap = yield* run(["brew", "tap", "LockedCodeAI/tap"], { env })
                 if (tap.code !== 0) {
                   upgradeResult = tap
                   break
                 }
-                const repo = yield* text(["brew", "--repo", "anomalyco/tap"])
+                const repo = yield* text(["brew", "--repo", "LockedCodeAI/tap"])
                 const dir = repo.trim()
                 if (dir) {
                   const pull = yield* run(["git", "pull", "--ff-only"], { cwd: dir, env })
@@ -302,7 +302,7 @@ export const layer: Layer.Layer<Service, never, HttpClient.HttpClient | ChildPro
               upgradeResult = yield* run(["choco", "upgrade", "lockedcode", `--version=${target}`, "-y"])
               break
             case "scoop":
-              upgradeResult = yield* run(["scoop", "install", `opencode@${target}`])
+              upgradeResult = yield* run(["scoop", "install", `lockedcode@${target}`])
               break
             default:
               return yield* new UpgradeFailedError({ stderr: `Unknown method: ${m}` })
