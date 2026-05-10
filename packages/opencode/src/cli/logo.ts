@@ -1,7 +1,7 @@
 export const logo = {
   left: [
     "  ╔══════════════════════════════════════╗",
-    "  ║    LockedCode · Secure Agentic Coding  ║",
+    "  ║   LockedCode · Secure Agentic Coding ║",
     "  ╚══════════════════════════════════════╝",
   ],
   right: [],
