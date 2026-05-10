@@ -39,8 +39,8 @@ export function FormatError(input: unknown) {
     return [
       `Model not found: ${data?.providerID}/${data?.modelID}`,
       ...(suggestions.length ? ["Did you mean: " + suggestions.join(", ")] : []),
-      `Try: \`opencode models\` to list available models`,
-      `Or check your config (opencode.json) provider/model names`,
+      `Try: \`lockedcode models\` to list available models`,
+      `Or check your config (lockedcode.json) provider/model names`,
     ].join("\n")
   }
 
