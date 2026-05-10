@@ -1,0 +1,3 @@
+[
+  {"id":"injection.unicode.zero-width-space","name":"Zero Width Space","severity":"warning","category":"unicode","pattern":"\\u200B"}
+]

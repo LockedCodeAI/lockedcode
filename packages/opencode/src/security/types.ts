@@ -182,7 +182,16 @@ export interface SecurityConfig {
   readonly confinement: ConfinementConfig
   readonly scanning: ScanningConfig
   readonly dlp: DLPConfig
+  readonly injection: InjectionConfig
   readonly audit: { readonly enabled: boolean }
+}
+
+/** Injection detection configuration. */
+export type InjectionSensitivity = "low" | "medium" | "high"
+
+export interface InjectionConfig {
+  readonly enabled: boolean
+  readonly sensitivity: InjectionSensitivity
 }
 
 /**
@@ -240,6 +249,10 @@ export const defaultSecurityConfig: SecurityConfig = {
     redactionMode: true,
     blockRestrictedFiles: true,
     piiCategories: { email: true, phone: true, ssn: true, creditCard: true, ipAddress: true },
+  },
+  injection: {
+    enabled: true,
+    sensitivity: "medium",
   },
   audit: { enabled: true },
 }

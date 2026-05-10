@@ -1,0 +1,3 @@
+[
+  {"id":"injection.encoded.base64-instruction","name":"Base64-encoded Instruction","severity":"high","category":"encoded","pattern":"[A-Za-z0-9+/]{40,}={0,2}"}
+]

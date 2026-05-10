@@ -1,0 +1,3 @@
+[
+  {"id":"injection.metadata.package-description","name":"Package Metadata Instruction","severity":"warning","category":"metadata","pattern":"\"description\"\\s*:.*?(ignore instructions|override|bypass|you are now)"}
+]

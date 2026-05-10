@@ -1,0 +1,3 @@
+[
+  {"id":"injection.role-override.ignore-instructions","name":"Ignore Previous Instructions","severity":"critical","category":"role-override","pattern":"ignore (all )?(previous|prior|your) (instructions|directives|rules|commands)"}
+]

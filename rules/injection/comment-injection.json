@@ -1,0 +1,3 @@
+[
+  {"id":"injection.comment.html-override","name":"HTML Comment Instruction Override","severity":"high","category":"comment-injection","pattern":"<!--[\\s\\S]*?(ignore|override|system|instruction|IMPORTANT)[\\s\\S]*?-->"}
+]

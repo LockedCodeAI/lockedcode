@@ -7,6 +7,7 @@ import { SemgrepScanner } from "./semgrep"
 import { YaraScanner } from "./yara"
 import { EntropyScanner } from "./entropy"
 import { SecretScanner } from "../secrets"
+import { InjectionScanner } from "../injection"
 
 const log = Log.create({ service: "scanning" })
 
@@ -70,6 +71,10 @@ export const layer = Layer.effect(
     // Register Secret scanner
     const secrets = yield* SecretScanner()
     scanners.push(secrets)
+
+    // Register Injection scanner
+    const injection = yield* InjectionScanner(defaultSecurityConfig.injection)
+    scanners.push(injection)
 
     let noScannerWarning = false
 

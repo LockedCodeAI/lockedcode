@@ -1,0 +1,3 @@
+[
+  {"id":"injection.system-markers.pipe-delimiter","name":"Model-specific Prompt Delimiter","severity":"high","category":"system-markers","pattern":"<\\|(system|user|assistant|tool|model)\\|>"}
+]
