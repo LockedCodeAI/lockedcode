@@ -10,6 +10,7 @@ type ExportArgs = { sessionId: string; output?: string }
 
 export const SessionListCommand = {
   command: "session list",
+  describe: "list recorded sessions",
   builder: (yargs: any) =>
     yargs
       .option("limit", { describe: "Max sessions", type: "number", default: 20 })
@@ -49,6 +50,7 @@ export const SessionListCommand = {
 
 export const SessionReplayCommand = {
   command: "session replay <sessionId>",
+  describe: "replay a recorded session",
   builder: (yargs: any) => yargs.positional("sessionId", { describe: "Session ID to replay", type: "string" }),
   handler: async (args: any) => {
     const sessionId = args.sessionId as string
@@ -67,6 +69,7 @@ export const SessionReplayCommand = {
 
 export const SessionExportCommand = {
   command: "session export <sessionId>",
+  describe: "export session data",
   builder: (yargs: any) =>
     yargs
       .positional("sessionId", { describe: "Session ID to export", type: "string" })

@@ -29,6 +29,7 @@ function countBundledRules(): number {
 
 export const RulesListCommand = {
   command: "rules list",
+  describe: "manage scanning rules",
   builder: (yargs: any) => yargs,
   handler: async () => {
     const { bundled, custom, customSources } = countActiveRules()
@@ -56,6 +57,7 @@ export const RulesListCommand = {
 
 export const RulesTestCommand = {
   command: "rules test [path]",
+  describe: "test a rule against sample content",
   builder: (yargs: any) =>
     yargs.positional("path", {
       describe: "Path to a specific rule file (optional)",

@@ -7,6 +7,7 @@ type Args = { framework?: string; since?: string; until?: string; output?: strin
 
 export const ComplianceReportCommand = {
   command: "compliance report",
+  describe: "compliance report generation",
   builder: (yargs: any) =>
     yargs
       .option("framework", { describe: "Compliance framework", type: "string", choices: ["soc2", "iso27001", "hipaa", "fedramp", "all"], default: "all" })

@@ -32,6 +32,7 @@ function formatDate(ts: number): string {
 
 export const QuarantineListCommand = {
   command: "quarantine list",
+  describe: "manage quarantined changes",
   builder: (yargs: any) =>
     yargs
       .option("status", { describe: "Filter by status", type: "string", choices: ["quarantined", "restored", "discarded"] })
@@ -81,6 +82,7 @@ export const QuarantineListCommand = {
 
 export const QuarantineShowCommand = {
   command: "quarantine show <id>",
+  describe: "show quarantined change details",
   builder: (yargs: any) => yargs.positional("id", { describe: "Quarantine record ID", type: "string" }),
   handler: async (args: any) => {
     const id = args.id as string
@@ -122,6 +124,7 @@ export const QuarantineShowCommand = {
 
 export const QuarantineRestoreCommand = {
   command: "quarantine restore <id>",
+  describe: "restore quarantined change",
   builder: (yargs: any) => yargs.positional("id", { describe: "Quarantine record ID", type: "string" }),
   handler: async (args: any) => {
     const id = args.id as string
@@ -142,6 +145,7 @@ export const QuarantineRestoreCommand = {
 
 export const QuarantineDiscardCommand = {
   command: "quarantine discard <id>",
+  describe: "discard quarantined change",
   builder: (yargs: any) => yargs.positional("id", { describe: "Quarantine record ID", type: "string" }),
   handler: async (args: any) => {
     const id = args.id as string

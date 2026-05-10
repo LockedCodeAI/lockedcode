@@ -159,6 +159,7 @@ function formatOutput(results: CheckResult[], overall: number, total: number): s
 
 export const SecurityCheckCommand = {
   command: "security-check",
+  describe: "run security capability check",
   builder: (yargs: any) => yargs,
   handler: async () => {
     const { results, overall, total } = runChecks()

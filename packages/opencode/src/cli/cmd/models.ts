@@ -34,6 +34,7 @@ function formatDate(ts: number): string {
 
 export const ModelsListCommand = {
   command: "models list",
+  describe: "manage model registry",
   builder: (yargs: any) => yargs,
   handler: async () => {
     const models = query("SELECT * FROM model_registry ORDER BY last_seen DESC")
@@ -76,6 +77,7 @@ export const ModelsListCommand = {
 
 export const ModelsApproveCommand = {
   command: "models approve <modelId>",
+  describe: "approve a model for use",
   builder: (yargs: any) =>
     yargs
       .positional("modelId", { describe: "Model ID to approve", type: "string" })
@@ -94,6 +96,7 @@ export const ModelsApproveCommand = {
 
 export const ModelsBlockCommand = {
   command: "models block <modelId>",
+  describe: "block a model from use",
   builder: (yargs: any) =>
     yargs
       .positional("modelId", { describe: "Model ID to block", type: "string" })
@@ -112,6 +115,7 @@ export const ModelsBlockCommand = {
 
 export const ModelsReportCommand = {
   command: "models report [modelId]",
+  describe: "model usage report",
   builder: (yargs: any) =>
     yargs.positional("modelId", { describe: "Model ID for detailed report", type: "string" }),
   handler: async (args: any) => {

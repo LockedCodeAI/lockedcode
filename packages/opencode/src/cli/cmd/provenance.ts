@@ -10,6 +10,7 @@ function formatDate(ts: number): string {
 
 export const ProvenanceCommand = {
   command: "provenance [file]",
+  describe: "model provenance tracking",
   builder: (yargs: any) =>
     yargs
       .positional("file", { describe: "File path to check provenance", type: "string" })

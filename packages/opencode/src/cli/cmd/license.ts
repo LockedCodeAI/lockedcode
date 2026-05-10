@@ -9,6 +9,7 @@ type ReportArgs = { since?: string }
 
 export const LicenseScanCommand = {
   command: "license scan <file>",
+  describe: "license contamination scanning",
   builder: (yargs: any) =>
     yargs
       .positional("file", { describe: "File to scan for license contamination", type: "string" })
@@ -53,6 +54,7 @@ export const LicenseScanCommand = {
 
 export const LicenseReportCommand = {
   command: "license report",
+  describe: "license contamination report",
   builder: (yargs: any) =>
     yargs.option("since", { describe: "Time range", type: "string" }),
   handler: async (args: any) => {

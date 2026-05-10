@@ -2,6 +2,7 @@ import type { CommandModule } from "yargs"
 
 export const MonitorStatusCommand = {
   command: "monitor status",
+  describe: "runtime monitoring status",
   builder: (yargs: any) => yargs,
   handler: async () => {
     console.log("\nRuntime Monitor")

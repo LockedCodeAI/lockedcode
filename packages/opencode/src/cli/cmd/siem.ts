@@ -49,6 +49,7 @@ function formatJSON(row: any): string {
 
 export const SIEMExportCommand = {
   command: "siem export",
+  describe: "SIEM event export",
   builder: (yargs: any) =>
     yargs
       .option("format", { describe: "Export format", type: "string", choices: ["cef", "ocsf", "json"], default: "json" })
@@ -104,6 +105,7 @@ export const SIEMExportCommand = {
 
 export const SIEMStreamCommand = {
   command: "siem stream",
+  describe: "SIEM event streaming",
   builder: (yargs: any) =>
     yargs
       .option("host", { describe: "Syslog host", type: "string", demandOption: true })
