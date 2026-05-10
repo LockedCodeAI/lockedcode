@@ -2,7 +2,6 @@ import { describe, expect } from "bun:test"
 import { Effect, Layer, Option } from "effect"
 import { testEffect } from "../../../test/lib/effect"
 import { Security } from "../index"
-import { Service as ConfinementService, defaultLayer as confinementLayer } from "../confinement"
 import { Service as ScanningService, defaultLayer as scanningLayer } from "../scanning"
 import { Service as DLPService, defaultLayer as dlpLayer } from "../dlp"
 import { Service as AuditService, defaultLayer as auditLayer } from "../audit"
@@ -14,8 +13,6 @@ import { defaultSecurityConfig } from "../types"
 // Test layers for subsystem-only tests (no Bus dependency)
 const subsystemLayer = Layer.mergeAll(
   Security.defaultLayer,
-  configLayer,
-  confinementLayer,
   scanningLayer,
   dlpLayer,
   auditLayer,
@@ -29,7 +26,7 @@ describe("SecurityService", () => {
   // SecurityService needs Bus which needs InstanceState — use instance test
   // For skeleton tests, verify the service interface works with a minimal layer
   const it = testEffect(Layer.mergeAll(Security.defaultLayer))
-  const minLayer = Layer.mergeAll(Security.defaultLayer, configLayer, confinementLayer, scanningLayer, dlpLayer, auditLayer, policyLayer, trustLayer)
+  const minLayer = Layer.mergeAll(Security.defaultLayer, scanningLayer, dlpLayer, auditLayer, policyLayer, trustLayer)
   const itMin = testEffect(minLayer)
 
   itMin.effect("can be instantiated via its Effect Layer", () =>
@@ -63,11 +60,12 @@ describe("SecurityService", () => {
     }),
   )
 
-  itMin.effect("checkConfinement returns allowed", () =>
+  itMin.effect("checkConfinement denies paths outside project root", () =>
     Effect.gen(function* () {
       const security = yield* Security.Service
-      const result = yield* security.checkConfinement("/some/path", "read")
-      expect(result.allowed).toBe(true)
+      const result = yield* security.checkConfinement("/nonexistent-outside-path", "read")
+      expect(result.allowed).toBe(false)
+      expect(result.escapable).toBe(true)
     }),
   )
 
@@ -96,14 +94,6 @@ describe("SecurityService", () => {
 })
 
 describe("Subsystem Stubs", () => {
-  subsystem.effect("ConfinementService can be instantiated", () =>
-    Effect.gen(function* () {
-      const svc = yield* ConfinementService
-      const result = yield* svc.checkPath("/path", "read")
-      expect(result.allowed).toBe(true)
-    }),
-  )
-
   subsystem.effect("ScanningService can be instantiated", () =>
     Effect.gen(function* () {
       const svc = yield* ScanningService

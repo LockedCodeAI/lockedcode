@@ -52,7 +52,7 @@ const subsystemLayer = Layer.mergeAll(
  * Layer providing SecurityService with all subsystem stubs.
  * Bus events are skipped in this layer (no Bus dependency required).
  */
-export const layer: Layer.Layer<Service> = Layer.effect(
+export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const config = yield* SecurityConfigService

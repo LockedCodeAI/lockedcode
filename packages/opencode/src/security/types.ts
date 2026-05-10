@@ -1,3 +1,5 @@
+import os from "os"
+
 /**
  * Security strictness level — drives the enforcement mode for all security checks.
  *
@@ -28,6 +30,31 @@ export interface ConfinementResult {
   readonly path: string
   readonly operation: "read" | "write" | "execute"
   readonly reason: string
+  readonly escapable: boolean
+  readonly escapeId?: string
+}
+
+/**
+ * A pending escape request that needs user approval.
+ */
+export interface EscapeRequest {
+  readonly id: string
+  readonly path: string
+  readonly operation: string
+  readonly reason: string
+  readonly modelId: string
+  readonly sessionId: string
+  readonly contentHash: string
+  readonly status: "pending" | "approved" | "denied"
+}
+
+/**
+ * Confinement-specific configuration.
+ */
+export interface ConfinementConfig {
+  readonly enabled: boolean
+  readonly projectRoot?: string
+  readonly preApprovedPaths: string[]
 }
 
 /**
@@ -99,7 +126,7 @@ export interface SecurityEvent {
 export interface SecurityConfig {
   readonly strictness: SecurityStrictness
   readonly enabled: boolean
-  readonly confinement: { readonly enabled: boolean }
+  readonly confinement: ConfinementConfig
   readonly scanning: { readonly enabled: boolean }
   readonly dlp: { readonly enabled: boolean }
   readonly audit: { readonly enabled: boolean }
@@ -110,11 +137,23 @@ export interface SecurityConfig {
  */
 export type FileSensitivity = "public" | "internal" | "confidential" | "restricted"
 
+/** Default pre-approved paths for confinement. */
+export const defaultPreApprovedPaths: string[] = [
+  os.tmpdir(),
+  "~/.npm",
+  "~/.bun",
+  "~/.cache",
+  "~/.local/share",
+]
+
 /** Default security configuration. */
 export const defaultSecurityConfig: SecurityConfig = {
   strictness: "standard",
   enabled: true,
-  confinement: { enabled: true },
+  confinement: {
+    enabled: true,
+    preApprovedPaths: defaultPreApprovedPaths,
+  },
   scanning: { enabled: true },
   dlp: { enabled: true },
   audit: { enabled: true },
