@@ -95,6 +95,7 @@ export const layer: Layer.Layer<
   | LSP.Service
   | Instruction.Service
   | AppFileSystem.Service
+  | Security.Service
   | Bus.Service
   | HttpClient.HttpClient
   | ChildProcessSpawner
@@ -109,6 +110,7 @@ export const layer: Layer.Layer<
     const agents = yield* Agent.Service
     const skill = yield* Skill.Service
     const truncate = yield* Truncate.Service
+    const security = yield* Security.Service
 
     const invalid = yield* InvalidTool
     const task = yield* TaskTool
@@ -326,19 +328,16 @@ export const layer: Layer.Layer<
           yield* plugin.trigger("tool.definition", { toolID: tool.id }, output)
 
           // Wrap tool execution with SecurityService interception.
-          // Uses Effect.serviceOption so security is optional — no required dependency.
           const originalExecute = tool.execute
-          const executeOpt = Option.getOrUndefined(yield* Effect.serviceOption(Security.Service)) as Security.Interface | undefined
-          const execute = executeOpt
-            ? (args: unknown, ctx: Tool.Context<Record<string, unknown>>) =>
-                Effect.gen(function* () {
-                  const policy = yield* executeOpt.evaluatePolicy(tool.id, {
+          const execute = (args: unknown, ctx: Tool.Context<Record<string, unknown>>) =>
+            Effect.gen(function* () {
+                  const policy = yield* security.evaluatePolicy(tool.id, {
                     sessionID: ctx.sessionID,
                     messageID: ctx.messageID,
                     agent: ctx.agent,
                   })
                   if (policy.action === "deny") {
-                    yield* executeOpt.recordAuditEvent({
+                    yield* security.recordAuditEvent({
                       eventType: "security.action_blocked",
                       sessionId: ctx.sessionID,
                       timestamp: Date.now(),
@@ -351,9 +350,9 @@ export const layer: Layer.Layer<
                   }
                   if (tool.id === "write" || tool.id === "edit" || tool.id === "patch") {
                     const content = typeof args === "object" && args !== null ? JSON.stringify(args) : String(args)
-                    const scanResult = yield* executeOpt.scanContent(content, { sessionID: ctx.sessionID, toolCallID: ctx.callID })
+                    const scanResult = yield* security.scanContent(content, { sessionID: ctx.sessionID, toolCallID: ctx.callID })
                     if (scanResult.action === "block") {
-                      yield* executeOpt.recordAuditEvent({
+                      yield* security.recordAuditEvent({
                         eventType: "security.action_blocked",
                         sessionId: ctx.sessionID,
                         timestamp: Date.now(),
@@ -371,9 +370,9 @@ export const layer: Layer.Layer<
                     const command = typeof args === "object" && args !== null
                       ? String((args as Record<string, unknown>).command ?? "")
                       : String(args)
-                    const scanResult = yield* executeOpt.scanCommand(command, { sessionID: ctx.sessionID, toolCallID: ctx.callID })
+                    const scanResult = yield* security.scanCommand(command, { sessionID: ctx.sessionID, toolCallID: ctx.callID })
                     if (scanResult.action === "block") {
-                      yield* executeOpt.recordAuditEvent({
+                      yield* security.recordAuditEvent({
                         eventType: "security.action_blocked",
                         sessionId: ctx.sessionID,
                         timestamp: Date.now(),
@@ -387,7 +386,7 @@ export const layer: Layer.Layer<
                     }
                   }
                   const result = yield* originalExecute(args, ctx)
-                  yield* executeOpt.recordAuditEvent({
+                  yield* security.recordAuditEvent({
                     eventType: "security.action_approved",
                     sessionId: ctx.sessionID,
                     timestamp: Date.now(),
@@ -398,7 +397,6 @@ export const layer: Layer.Layer<
                   })
                   return result
                 }).pipe(Effect.orDie) as Effect.Effect<Tool.ExecuteResult>
-            : originalExecute
 
           return {
             id: tool.id,
@@ -441,7 +439,7 @@ export const defaultLayer = Layer.suspend(() =>
     Layer.provide(LSP.defaultLayer),
     Layer.provide(Instruction.defaultLayer),
     Layer.provide(AppFileSystem.defaultLayer),
-    Layer.provide(Security.busLayer),
+    Layer.provideMerge(Security.busLayer),
     Layer.provide(Bus.layer),
     Layer.provide(FetchHttpClient.layer),
     Layer.provide(Format.defaultLayer),

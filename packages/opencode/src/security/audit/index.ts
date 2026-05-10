@@ -114,21 +114,21 @@ export const layer = Layer.effect(
     const record = Effect.fn("Audit.record")(function* (event: SecurityEvent) {
       const id = Identifier.create("sec", "ascending")
       const ch = hashContent(JSON.stringify(event.details ?? {}))
+      const now = Date.now()
 
-      yield* Effect.sync(() =>
-        db.insert(SecurityEventTable).values({
-          id,
-          session_id: event.sessionId,
-          timestamp: event.timestamp,
-          event_type: event.eventType,
-          severity: event.severity ?? "info",
-          tool_name: event.toolName ?? null,
-          model_id: event.modelId ?? null,
-          content_hash: ch,
-          action_taken: event.actionTaken,
-          details: event.details,
-        }).run(),
-      )
+      db.insert(SecurityEventTable).values({
+        id,
+        session_id: event.sessionId,
+        timestamp: event.timestamp,
+        event_type: event.eventType,
+        severity: event.severity ?? "info",
+        tool_name: event.toolName ?? null,
+        model_id: event.modelId ?? null,
+        content_hash: ch,
+        action_taken: event.actionTaken,
+        details: event.details ?? null,
+        time_created: now,
+      }).run()
 
       log.debug("audit event recorded", { id, eventType: event.eventType, sessionId: event.sessionId })
       return id
@@ -156,6 +156,7 @@ export const layer = Layer.effect(
           matched_content_hash: ch,
           line_number: sr.lineNumber ?? null,
           remediation: sr.remediation ?? null,
+          time_created: Date.now(),
         }).run(),
       )
     })
@@ -177,6 +178,7 @@ export const layer = Layer.effect(
           evaluation_result: pd.evaluationResult,
           override_by: pd.overrideBy ?? null,
           override_reason: pd.overrideReason ?? null,
+          time_created: Date.now(),
         }).run(),
       )
     })
