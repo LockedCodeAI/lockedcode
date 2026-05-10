@@ -12,6 +12,7 @@ import { ModelsListCommand, ModelsApproveCommand, ModelsBlockCommand, ModelsRepo
 import { SIEMExportCommand, SIEMStreamCommand } from "./cli/cmd/siem"
 import { ComplianceReportCommand } from "./cli/cmd/compliance"
 import { LicenseScanCommand, LicenseReportCommand } from "./cli/cmd/license"
+import { QuarantineListCommand, QuarantineShowCommand, QuarantineRestoreCommand, QuarantineDiscardCommand } from "./cli/cmd/quarantine"
 import { UI } from "./cli/ui"
 import { Installation } from "./installation"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
@@ -183,6 +184,10 @@ const cli = yargs(args)
   .command(ComplianceReportCommand)
   .command(LicenseScanCommand)
   .command(LicenseReportCommand)
+  .command(QuarantineListCommand)
+  .command(QuarantineShowCommand)
+  .command(QuarantineRestoreCommand)
+  .command(QuarantineDiscardCommand)
   .fail((msg, err) => {
     if (
       msg?.startsWith("Unknown argument") ||
