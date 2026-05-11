@@ -566,6 +566,7 @@
         <li><span class="label">Reads</span>What the model reads is checked for prompt injection attacks designed to manipulate the agent's behavior.</li>
         <li><span class="label">Installs</span>What the model installs is checked for typosquatting, suspicious post-install scripts, and package policy violations.</li>
         <li><span class="label">Reaches</span>Where the model can reach is confined to the project directory at the kernel level — no amount of clever LLM output gets past a Landlock jail.</li>
+        <li><span class="label">Extends</span>What the model extends — MCP servers and plugins — is scanned through the same security pipeline. No tool bypasses scanning, whether built-in or external.</li>
         <li><span class="label">Tracked</span>Which model produced which code is recorded per-file so compromised models can be identified and their output reviewed.</li>
         <li><span class="label">Logged</span>Everything that happens is recorded in an immutable, content-hashed audit trail that satisfies compliance frameworks.</li>
       </ul>
@@ -616,13 +617,14 @@
             <li><strong>macOS:</strong> Process-level sandbox profiles with FSEvents monitoring</li>
             <li>Aggressive path canonicalization defeats symlinks, relative paths, hardlinks, junction points, and mount traversal</li>
             <li>Controlled escape hatch for package managers, Docker, and build tools</li>
+            <li>No parent directory config injection — LockedCode reads config only from the project root, never from parent directories</li>
             <li>Process tree inheritance — child processes inherit confinement</li>
           </ul>
         </div>
 
         <div class="feature-card">
           <h3>Static Scanning Pipeline</h3>
-          <p>Every piece of code the LLM proposes is scanned before it touches the filesystem. Six scanners run in parallel.</p>
+          <p>Every piece of code the LLM proposes is scanned before it touches the filesystem. Seven scanners run in parallel.</p>
           <ul>
             <li>Semgrep integration with custom rulesets tuned for LLM failure modes</li>
             <li>YARA signature scanning for known malicious patterns</li>
@@ -630,6 +632,7 @@
             <li>Secret detection across 50+ credential formats</li>
             <li>Prompt injection detection in ingested files</li>
             <li>Custom rule scanner for organization-specific patterns</li>
+            <li>License contamination scanner flags copyleft code reproduced from training data</li>
             <li>Scans fire before every file write and edit — malicious code never touches disk</li>
           </ul>
         </div>
@@ -825,6 +828,39 @@
           </ul>
         </div>
 
+        <!-- ── Platform Hardening ── -->
+        <div class="section-divider">Platform Hardening</div>
+
+        <div class="feature-card">
+          <h3>MCP Tool Scanning</h3>
+          <p>External MCP server tools pass through the same security pipeline as built-in tools. No backdoor around scanning.</p>
+          <ul>
+            <li>File writes from MCP tools are scanned by the full scanning pipeline</li>
+            <li>Shell commands from MCP tools go through command analysis</li>
+            <li>MCP tool results recorded in the audit trail</li>
+          </ul>
+        </div>
+
+        <div class="feature-card">
+          <h3>Plugin Lockdown</h3>
+          <p>External plugins are disabled by default. Security tools should not load unverified code.</p>
+          <ul>
+            <li>Pure mode (no external plugins) is the default — opt in explicitly with <code>--allow-plugins</code></li>
+            <li>When plugins are loaded, a security warning is logged</li>
+          </ul>
+        </div>
+
+        <div class="feature-card">
+          <h3>Server Authentication</h3>
+          <p>Web and headless server modes require authentication. A security tool should not be remotely controllable without credentials.</p>
+          <ul>
+            <li>Random auth token generated on startup for web and serve modes</li>
+            <li>All requests require <code>Authorization: Bearer</code> header</li>
+            <li>Warning when binding to non-localhost addresses</li>
+            <li>No mDNS service discovery — LockedCode never advertises its presence on the network</li>
+          </ul>
+        </div>
+
         <div class="feature-card">
           <h3>Air-Gap Mode</h3>
           <p>Full functionality with zero internet access. No cloud dependencies, no telemetry, no phone-home.</p>
@@ -890,7 +926,7 @@
 
       <h3>Post-Install: Security Capability Check</h3>
       <p>After installation, run:</p>
-<pre><code><span class="cmd">lockedcode</span> --security-check</code></pre>
+<pre><code><span class="cmd">lockedcode</span> security-check</code></pre>
       <p>This reports the security capabilities available on your platform: confinement backend, scanner availability, policy file detection, and air-gap mode status.</p>
     </section>
 
@@ -951,7 +987,7 @@
     <!-- ═══════ RELATIONSHIP ═══════ -->
     <section id="comparison">
       <h2>Relationship to OpenCode</h2>
-      <p>LockedCode is a fork of <a href="https://github.com/anomalyco/opencode">OpenCode</a> (MIT License). It tracks upstream development and selectively merges new features and fixes. All original OpenCode capabilities — provider integrations, TUI, LSP support, MCP, client/server architecture, plugin system — are fully preserved.</p>
+      <p>LockedCode is a standalone project built on <a href="https://github.com/anomalyco/opencode">OpenCode</a> (MIT License). It selectively merges upstream features and fixes. All original OpenCode capabilities — provider integrations, TUI, LSP support, client/server architecture — are preserved, with security-incompatible features removed or hardened (mDNS removed, plugins disabled by default, server auth required, parent directory config injection eliminated).</p>
       <p>The fork diverges in one dimension: LockedCode adds a security layer that OpenCode's maintainers are unlikely to add as a core feature, because deep security confinement adds friction by design.</p>
       <p>LockedCode is for organizations and developers who need that friction — who need verifiable evidence that the agent can't do anything it wasn't supposed to.</p>
 
@@ -959,7 +995,7 @@
       <p>Everything OpenCode does, plus:</p>
       <ul class="diff-list">
         <li>OS-level directory confinement (Landlock, sandbox-exec, restricted tokens)</li>
-        <li>Six-scanner static analysis pipeline (Semgrep, YARA, Entropy, Secrets, Injection, Custom)</li>
+        <li>Seven-scanner static analysis pipeline (Semgrep, YARA, Entropy, Secrets, Injection, Custom, License)</li>
         <li>Shell command structural parsing and analysis before execution</li>
         <li>Outbound DLP preventing secrets and PII from reaching the model</li>
         <li>Prompt injection detection on ingested files</li>
@@ -977,6 +1013,11 @@
         <li>Custom rule authoring SDK</li>
         <li>Runtime monitoring (eBPF)</li>
         <li>Multi-agent security cascade</li>
+        <li>MCP tool scanning — external tools go through the same security pipeline</li>
+        <li>Plugin lockdown — external plugins disabled by default</li>
+        <li>Server authentication — web and serve modes require auth tokens</li>
+        <li>No mDNS service discovery — never advertises presence on network</li>
+        <li>No parent directory config injection — reads config only from project root</li>
         <li>Full air-gap mode with bundled rule sets</li>
       </ul>
 

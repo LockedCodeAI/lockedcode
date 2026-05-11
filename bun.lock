@@ -362,7 +362,7 @@
       "name": "lockedcode",
       "version": "1.14.44",
       "bin": {
-        "lockedcode": "./bin/opencode",
+        "lockedcode": "./bin/lockedcode",
       },
       "dependencies": {
         "@actions/core": "1.11.1",
