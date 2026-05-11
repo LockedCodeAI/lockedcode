@@ -135,7 +135,7 @@ async function backupAndStripLegacy(file: string, source: string) {
 async function opencodeFiles(input: { directories: string[]; cwd: string }) {
   const files = [
     ...ConfigPaths.fileInDirectory(Global.Path.config, "lockedcode"),
-    ...(await Filesystem.findUp(["lockedcode.json", "lockedcode.jsonc"], input.cwd, undefined, { rootFirst: true })),
+    ...(await Filesystem.findUp(["lockedcode.json", "lockedcode.jsonc"], input.cwd, input.cwd, { rootFirst: true })),
   ]
   for (const dir of unique(input.directories)) {
     files.push(...ConfigPaths.fileInDirectory(dir, "lockedcode"))
