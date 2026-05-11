@@ -467,6 +467,17 @@ NOTE: At any point in time through this workflow you should feel free to ask the
           run.promise(
             Effect.gen(function* () {
               const ctx = context(args, opts)
+
+              // Security scanning for MCP tools
+              const secOpt = Option.getOrUndefined(yield* Effect.serviceOption(Security.Service))
+              if (secOpt) {
+                yield* secOpt.evaluatePolicy(key, {
+                  sessionID: ctx.sessionID,
+                  messageID: input.processor.message.id,
+                  agent: input.agent.name,
+                })
+              }
+
               yield* plugin.trigger(
                 "tool.execute.before",
                 { tool: key, sessionID: ctx.sessionID, callID: opts.toolCallId },

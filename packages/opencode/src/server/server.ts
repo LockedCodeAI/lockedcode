@@ -3,7 +3,6 @@ import { ConfigProvider, Context, Effect, Exit, Layer, Scope } from "effect"
 import { HttpRouter, HttpServer } from "effect/unstable/http"
 import { OpenApi } from "effect/unstable/httpapi"
 import * as HttpApiServer from "#httpapi-server"
-import { MDNS } from "./mdns"
 import { initProjectors } from "./projectors"
 import { ExperimentalHttpApiServer } from "./routes/instance/httpapi/server"
 import { disposeMiddleware } from "./routes/instance/httpapi/lifecycle"
@@ -33,8 +32,6 @@ type ServerApp = {
 type ListenOptions = CorsOptions & {
   port: number
   hostname: string
-  mdns?: boolean
-  mdnsDomain?: string
 }
 
 const defaultHttpApi = (() => {
@@ -114,22 +111,8 @@ export async function listen(opts: ListenOptions): Promise<Listener> {
   innerUrl.port = String(port)
   url = innerUrl
 
-  const mdns =
-    opts.mdns && port && opts.hostname !== "127.0.0.1" && opts.hostname !== "localhost" && opts.hostname !== "::1"
-  if (mdns) {
-    MDNS.publish(port, opts.mdnsDomain)
-  } else if (opts.mdns) {
-    log.warn("mDNS enabled but hostname is loopback; skipping mDNS publish")
-  }
-
   let forceStopPromise: Promise<void> | undefined
   let stopPromise: Promise<void> | undefined
-  let mdnsUnpublished = false
-  const unpublish = () => {
-    if (!mdns || mdnsUnpublished) return
-    mdnsUnpublished = true
-    MDNS.unpublish()
-  }
   const forceStop = () => {
     forceStopPromise ??= Effect.runPromiseExit(
       Effect.gen(function* () {
@@ -145,7 +128,6 @@ export async function listen(opts: ListenOptions): Promise<Listener> {
     port,
     url: innerUrl,
     stop: (close?: boolean) => {
-      unpublish()
       const requested = close ? forceStop() : Promise.resolve()
       stopPromise ??= requested
         .then(() => Effect.runPromiseExit(Scope.close(resolved!.scope, Exit.void)))

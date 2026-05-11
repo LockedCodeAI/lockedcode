@@ -9,7 +9,7 @@ type ShowArgs = { id: string }
 type RestoreArgs = { id: string }
 type DiscardArgs = { id: string }
 
-const DB_PATH = path.join(os.homedir(), ".local", "share", "lockedcode", "opencode-local.db")
+const DB_PATH = path.join(os.homedir(), ".local", "share", "lockedcode", "lockedcode-local.db")
 
 function query(sql: string): any[] {
   try {

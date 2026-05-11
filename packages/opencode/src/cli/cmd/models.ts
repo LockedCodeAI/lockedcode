@@ -8,7 +8,7 @@ type ApproveArgs = { modelId: string; reason?: string }
 type BlockArgs = { modelId: string; reason?: string }
 type ReportArgs = { modelId?: string }
 
-const DB_PATH = path.join(require("os").homedir(), ".local", "share", "lockedcode", "opencode-local.db")
+const DB_PATH = path.join(require("os").homedir(), ".local", "share", "lockedcode", "lockedcode-local.db")
 
 function query(sql: string): any[] {
   try {

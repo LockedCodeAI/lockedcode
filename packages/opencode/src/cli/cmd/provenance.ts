@@ -20,7 +20,7 @@ export const ProvenanceCommand = {
     console.log("Provenance tracking is stored in the SQLite database.")
     console.log()
     console.log("Query the file_provenance table directly:")
-    console.log("  sqlite3 ~/.local/share/lockedcode/opencode-local.db \\")
+    console.log("  sqlite3 ~/.local/share/lockedcode/lockedcode-local.db \\")
     console.log('    "SELECT * FROM file_provenance ORDER BY timestamp DESC LIMIT 20"')
     console.log()
     console.log("Or use --model to filter by model ID:")
@@ -30,10 +30,8 @@ export const ProvenanceCommand = {
     console.log("  lockedcode provenance src/security/index.ts")
 
     if (args.model) {
-      console.log(`\nFiltering by model: ${args.model}`)
-      const cwd = process.cwd()
       const dataDir = path.join(require("os").homedir(), ".local", "share", "lockedcode")
-      const dbPath = path.join(dataDir, "opencode-local.db")
+      const dbPath = path.join(dataDir, "lockedcode-local.db")
       if (fs.existsSync(dbPath)) {
         // Simple SQLite query via bun shell
         const { $ } = await import("bun")

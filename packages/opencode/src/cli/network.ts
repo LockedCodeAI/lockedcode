@@ -13,16 +13,6 @@ const options = {
     describe: "hostname to listen on",
     default: "127.0.0.1",
   },
-  mdns: {
-    type: "boolean" as const,
-    describe: "enable mDNS service discovery (defaults hostname to 0.0.0.0)",
-    default: false,
-  },
-  "mdns-domain": {
-    type: "string" as const,
-    describe: "custom domain name for mDNS service (default: lockedcode.local)",
-    default: "lockedcode.local",
-  },
   cors: {
     type: "string" as const,
     array: true,
@@ -44,19 +34,13 @@ export const resolveNetworkOptions = Effect.fn("Cli.resolveNetworkOptions")(func
 export function resolveNetworkOptionsNoConfig(args: NetworkOptions, config?: Config.Info) {
   const portExplicitlySet = process.argv.includes("--port")
   const hostnameExplicitlySet = process.argv.includes("--hostname")
-  const mdnsExplicitlySet = process.argv.includes("--mdns")
-  const mdnsDomainExplicitlySet = process.argv.includes("--mdns-domain")
-  const mdns = mdnsExplicitlySet ? args.mdns : (config?.server?.mdns ?? args.mdns)
-  const mdnsDomain = mdnsDomainExplicitlySet ? args["mdns-domain"] : (config?.server?.mdnsDomain ?? args["mdns-domain"])
   const port = portExplicitlySet ? args.port : (config?.server?.port ?? args.port)
   const hostname = hostnameExplicitlySet
     ? args.hostname
-    : mdns && !config?.server?.hostname
-      ? "0.0.0.0"
-      : (config?.server?.hostname ?? args.hostname)
+    : (config?.server?.hostname ?? args.hostname)
   const configCors = config?.server?.cors ?? []
   const argsCors = Array.isArray(args.cors) ? args.cors : args.cors ? [args.cors] : []
   const cors = [...configCors, ...argsCors]
 
-  return { hostname, port, mdns, mdnsDomain, cors }
+  return { hostname, port, cors }
 }

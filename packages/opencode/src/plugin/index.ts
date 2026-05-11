@@ -157,9 +157,12 @@ export const layer = Layer.effect(
           if (init._tag === "Some") hooks.push(init.value)
         }
 
-        const plugins = Flag.OPENCODE_PURE ? [] : (cfg.plugin_origins ?? [])
-        if (Flag.OPENCODE_PURE && cfg.plugin_origins?.length) {
-          log.info("skipping external plugins in pure mode", { count: cfg.plugin_origins.length })
+        const plugins = Flag.OPENCODE_PURE || !process.env.LOCKEDCODE_ALLOW_PLUGINS ? [] : (cfg.plugin_origins ?? [])
+        if (plugins.length === 0 && cfg.plugin_origins?.length) {
+          log.info("external plugins disabled by default; use --allow-plugins to enable")
+        }
+        if (plugins.length && cfg.plugin_origins?.length) {
+          log.warn("LockedCode: External plugins enabled — plugin tools bypass security scanning")
         }
         if (plugins.length) yield* config.waitForDependencies()
 

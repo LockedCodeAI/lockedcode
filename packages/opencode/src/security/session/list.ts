@@ -15,7 +15,7 @@ function query(sql: string): any[] {
     const path = require("path")
     const fs = require("fs")
     const { execFileSync } = require("child_process")
-    const dbPath = path.join(os.homedir(), ".local", "share", "lockedcode", "opencode-local.db")
+    const dbPath = path.join(os.homedir(), ".local", "share", "lockedcode", "lockedcode-local.db")
     if (!fs.existsSync(dbPath)) return []
     const result = execFileSync("sqlite3", ["-json", dbPath, sql], { encoding: "utf-8", maxBuffer: 1024 * 1024 })
     return JSON.parse(result || "[]")

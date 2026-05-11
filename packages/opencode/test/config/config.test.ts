@@ -2497,7 +2497,7 @@ test("parseManagedPlist parses server settings", async () => {
       await ConfigManaged.parseManagedPlist(
         JSON.stringify({
           $schema: "https://lockedcode.ai/config.json",
-          server: { hostname: "127.0.0.1", mdns: false },
+          server: { hostname: "127.0.0.1" },
           autoupdate: true,
         }),
       ),
@@ -2506,7 +2506,6 @@ test("parseManagedPlist parses server settings", async () => {
     "test:mobileconfig",
   )
   expect(config.server?.hostname).toBe("127.0.0.1")
-  expect(config.server?.mdns).toBe(false)
   expect(config.autoupdate).toBe(true)
 })
 

@@ -7,7 +7,7 @@ import { execFileSync } from "child_process"
 type ExportArgs = { format: string; since?: string; severity?: string; output?: string }
 type StreamArgs = { host: string; port: number; protocol?: string; format?: string; severity?: string }
 
-const DB_PATH = path.join(os.homedir(), ".local", "share", "lockedcode", "opencode-local.db")
+const DB_PATH = path.join(os.homedir(), ".local", "share", "lockedcode", "lockedcode-local.db")
 
 function query(sql: string): any[] {
   try {

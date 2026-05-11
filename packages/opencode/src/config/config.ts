@@ -444,6 +444,18 @@ export const layer = Layer.effect(
         )
       }
 
+      // Warn about plain-text provider credentials
+      if (result.provider) {
+        for (const [providerId, pCfg] of Object.entries(result.provider)) {
+          if (pCfg?.options?.apiKey) {
+            log.warn("LockedCode: Provider credentials stored in plain text", {
+              provider: providerId,
+              path: Global.Path.config,
+            })
+          }
+        }
+      }
+
       return result
     })
 

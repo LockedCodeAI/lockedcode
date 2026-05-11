@@ -92,12 +92,19 @@ const cli = yargs(args)
     choices: ["DEBUG", "INFO", "WARN", "ERROR"],
   })
   .option("pure", {
-    describe: "run without external plugins",
+    describe: "run without external plugins (default)",
+    type: "boolean",
+  })
+  .option("allow-plugins", {
+    describe: "enable external plugin loading (use only with trusted sources)",
     type: "boolean",
   })
   .middleware(async (opts) => {
     if (opts.pure) {
       process.env.OPENCODE_PURE = "1"
+    }
+    if (opts["allow-plugins"]) {
+      process.env.LOCKEDCODE_ALLOW_PLUGINS = "1"
     }
 
     await Log.init({
@@ -123,7 +130,7 @@ const cli = yargs(args)
       run_id: processMetadata.runID,
     })
 
-    const marker = path.join(Global.Path.data, "opencode.db")
+    const marker = path.join(Global.Path.data, "lockedcode.db")
     if (!(await Filesystem.exists(marker))) {
       const tty = process.stderr.isTTY
       process.stderr.write("Performing one time database migration, may take a few minutes..." + EOL)
