@@ -102,7 +102,7 @@ export const SECRET_PATTERNS: SecretPattern[] = [
   {
     id: "stripe-secret-key",
     name: "Stripe Secret Key",
-    regex: /(?:sk|rk|rk_live)_(?:live|test)_[0-9A-Za-z]{24,}/,
+    regex: /(?:sk|rk|rk_live)_(?:live|test)_[0-9A-Za-z]{20,}/,
     severity: "critical",
     description: "Stripe Secret or Restricted Key",
     remediation: "Rotate the key in Stripe Dashboard > Developers > API Keys.",
