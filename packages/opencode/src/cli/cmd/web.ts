@@ -4,6 +4,7 @@ import { UI } from "../ui"
 import { effectCmd } from "../effect-cmd"
 import { withNetworkOptions, resolveNetworkOptions } from "../network"
 import { Flag } from "@opencode-ai/core/flag/flag"
+import { ServerAuth } from "@/server/auth"
 import open from "open"
 import { networkInterfaces } from "os"
 
@@ -31,16 +32,35 @@ function getNetworkIPs() {
 
 export const WebCommand = effectCmd({
   command: "web",
-  builder: (yargs) => withNetworkOptions(yargs),
+  builder: (yargs) =>
+    withNetworkOptions(yargs).option("no-auth", {
+      type: "boolean",
+      describe: "disable authentication (not recommended)",
+      default: false,
+    }),
   describe: "start lockedcode server and open web interface",
   // Server loads instances per-request via x-opencode-directory header — no
   // ambient project InstanceContext needed at startup.
   instance: false,
   handler: Effect.fn("Cli.web")(function* (args) {
-    if (!Flag.LOCKEDCODE_SERVER_PASSWORD) {
-      UI.println(UI.Style.TEXT_WARNING_BOLD + "!  LOCKEDCODE_SERVER_PASSWORD is not set; server is unsecured.")
-    }
     const opts = yield* resolveNetworkOptions(args)
+
+    if (opts.hostname !== "127.0.0.1" && opts.hostname !== "localhost") {
+      UI.println(
+        UI.Style.TEXT_WARNING_BOLD + "WARNING: LockedCode server exposed to network on " + opts.hostname + ".",
+      )
+      UI.println(UI.Style.TEXT_WARNING_BOLD + "Ensure auth is enabled.")
+    }
+
+    if (!Flag.LOCKEDCODE_SERVER_PASSWORD && !args["no-auth"]) {
+      const token = process.env.LOCKEDCODE_AUTH_TOKEN || ServerAuth.generateToken()
+      process.env.LOCKEDCODE_SERVER_PASSWORD = token
+      process.env.LOCKEDCODE_SERVER_USERNAME = "lockedcode"
+      UI.println(UI.Style.TEXT_INFO_BOLD + "  Auth token:        ", UI.Style.TEXT_NORMAL, token)
+    } else if (args["no-auth"]) {
+      UI.println(UI.Style.TEXT_WARNING_BOLD + "  WARNING: Server running without authentication.")
+    }
+
     const server = yield* Effect.promise(() => Server.listen(opts))
     UI.empty()
     UI.println(UI.logo("  "))

@@ -1,5 +1,6 @@
 export * as ServerAuth from "./auth"
 
+import crypto from "crypto"
 import { ConfigService } from "@/effect/config-service"
 import { Flag } from "@opencode-ai/core/flag/flag"
 import { Config as EffectConfig, Context, Option, Redacted } from "effect"
@@ -20,6 +21,13 @@ export class Config extends ConfigService.Service<Config>()("@opencode/ServerAut
 }) {}
 
 export type Info = Context.Service.Shape<typeof Config>
+
+/**
+ * Generate a random hex token for server authentication.
+ */
+export function generateToken(): string {
+  return crypto.randomBytes(16).toString("hex")
+}
 
 export function required(config: Info) {
   return Option.isSome(config.password) && config.password.value !== ""
