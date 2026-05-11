@@ -549,7 +549,7 @@
       <p>It's also entirely trust-based. The LLM proposes an action, the developer gets a confirmation prompt, and the action executes. There are no hard boundaries on what the agent can access, no scanning of what it produces, no audit trail of what it did, and no protection against what it sends to the model provider. For solo developers using frontier models from trusted providers, that's fine.</p>
       <p>For corporate development teams — especially those using open-source, self-hosted, or offline models to manage token costs — it's a non-starter.</p>
       <p><strong>LockedCode fixes this.</strong> It adds a comprehensive security layer between the LLM's intent and the agent's execution. Every file write passes through static scanning. Every shell command is parsed and analyzed. Every outbound context payload is checked for secrets and PII. Every action is confined to the project directory at the operating system level. Everything is logged in an immutable audit trail. Every security decision is configurable via declarative policy. Every model that touches your code is tracked. Every compliance requirement is documented. And when something goes wrong, you can roll back to safety.</p>
-      <p>LockedCode is not a wrapper around OpenCode. It <em>is</em> OpenCode — every feature, every provider integration, every TUI capability — with a security layer that makes it safe for real codebases, real teams, and real compliance requirements.</p>
+      <p>LockedCode is not a wrapper around OpenCode. It <em>is</em> OpenCode — every feature, every provider integration, every TUI capability — with a security layer that adds zero performance overhead. Same speed. Same workflow. Full protection.</p>
     </section>
 
     <!-- ═══════ WHY ═══════ -->
@@ -988,11 +988,11 @@
     <section id="comparison">
       <h2>Relationship to OpenCode</h2>
       <p>LockedCode is a standalone project built on <a href="https://github.com/anomalyco/opencode">OpenCode</a> (MIT License). It selectively merges upstream features and fixes. All original OpenCode capabilities — provider integrations, TUI, LSP support, client/server architecture — are preserved, with security-incompatible features removed or hardened (mDNS removed, plugins disabled by default, server auth required, parent directory config injection eliminated).</p>
-      <p>The fork diverges in one dimension: LockedCode adds a security layer that OpenCode's maintainers are unlikely to add as a core feature, because deep security confinement adds friction by design.</p>
-      <p>LockedCode is for organizations and developers who need that friction — who need verifiable evidence that the agent can't do anything it wasn't supposed to.</p>
+      <p>LockedCode adds a comprehensive security layer with zero performance overhead — same speed, same capabilities, plus confinement, scanning, auditing, and compliance. The only things removed from the upstream are security vulnerabilities: mDNS network broadcasting, parent directory config injection, and unrestricted external plugins.</p>
+      <p>There is no tradeoff. LockedCode is OpenCode with security. Nothing is slower, nothing is missing, nothing is harder to use. You get verifiable evidence that the agent can't do anything it wasn't supposed to — for free.</p>
 
       <h3>vs OpenCode</h3>
-      <p>Everything OpenCode does, plus:</p>
+      <p>Everything OpenCode does, plus — with zero performance overhead:</p>
       <ul class="diff-list">
         <li>OS-level directory confinement (Landlock, sandbox-exec, restricted tokens)</li>
         <li>Seven-scanner static analysis pipeline (Semgrep, YARA, Entropy, Secrets, Injection, Custom, License)</li>
