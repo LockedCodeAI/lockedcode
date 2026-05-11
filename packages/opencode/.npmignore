@@ -1,0 +1,55 @@
+# Flutter test app
+android/
+ios/
+macos/
+linux/
+windows/
+web/
+lib/
+.dart_tool/
+.metadata
+pubspec.*
+analysis_options.yaml
+*.iml
+*.dart
+
+# Test files
+test/
+specs/
+src/security/__tests__/
+*.test.ts
+*.test.tsx
+
+# Dev files
+.vscode/
+.zed/
+.github/
+.husky/
+.opencode/
+.scribe-history/
+.editorconfig
+.oxlintrc.json
+.prettierignore
+.gitignore
+.gitleaksignore
+.nojekyll
+BUN_SHELL_MIGRATION_PLAN.md
+Dockerfile
+CNAME
+sst-env.d.ts
+opencode.iml
+
+# Large fixtures
+test/tool/fixtures/
+
+# Migration snapshot files (large JSON, not needed at runtime)
+migration/*/snapshot.json
+
+# Large generated files
+src/provider/models-snapshot.js
+
+# TUI audio assets (not needed for headless CLI)
+src/cli/cmd/tui/asset/*.wav
+
+# Build output
+dist/
