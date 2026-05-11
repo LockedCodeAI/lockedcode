@@ -79,7 +79,7 @@ export const layer = Layer.effect(
         operation: "write",
       }
       const result = yield* scanning.scan(content, scanMeta)
-      const secEventId: string | null = null
+      const secEventId = (metadata.securityEventId as string) ?? null
       for (const finding of result.findings) {
         yield* audit.recordScanResult({
           securityEventId: secEventId,
@@ -112,7 +112,7 @@ export const layer = Layer.effect(
           (f) => !analysis.findings.some((af) => af.ruleId === f.ruleId),
         ),
       ]
-      const secEventId = (metadata.securityEventId as string) ?? ""
+      const secEventId = (metadata.securityEventId as string) ?? null
       for (const finding of mergedFindings) {
         yield* audit.recordScanResult({
           securityEventId: secEventId,
@@ -223,7 +223,7 @@ export const busLayer = Layer.effect(
         operation: "write",
       }
       const result = yield* scanning.scan(content, scanMeta)
-      const secEventId: string | null = null
+      const secEventId = (metadata.securityEventId as string) ?? null
       for (const finding of result.findings) {
         yield* audit.recordScanResult({
           securityEventId: secEventId,
@@ -242,6 +242,8 @@ export const busLayer = Layer.effect(
         duration: 0,
       })
       return result
+
+    // scanCommand in busLayer — uses analyzeCommand + scanning + bus events
     })
 
     // scanCommand in busLayer — uses analyzeCommand + scanning + bus events
@@ -262,7 +264,7 @@ export const busLayer = Layer.effect(
           (f) => !analysis.findings.some((af) => af.ruleId === f.ruleId),
         ),
       ]
-      const secEventId: string | null = null
+      const secEventId = (metadata.securityEventId as string) ?? null
       for (const finding of mergedFindings) {
         yield* audit.recordScanResult({
           securityEventId: secEventId,

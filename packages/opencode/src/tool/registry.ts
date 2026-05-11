@@ -51,6 +51,7 @@ import { Git } from "@/git"
 import { Skill } from "../skill"
 import { Permission } from "@/permission"
 import { Security } from "@/security"
+import { hashContent } from "@/security/audit/hash"
 
 const log = Log.create({ service: "tool.registry" })
 
@@ -331,6 +332,28 @@ export const layer: Layer.Layer<
           const originalExecute = tool.execute
           const execute = (args: unknown, ctx: Tool.Context<Record<string, unknown>>) =>
             Effect.gen(function* () {
+              const now = Date.now()
+
+              // Extract file path and content from args
+              const argsObj = typeof args === "object" && args !== null ? (args as Record<string, unknown>) : {}
+              const filePath = String(argsObj.filePath ?? argsObj.file ?? "")
+              const rawContent = JSON.stringify(args)
+              const contentForHash = hashContent(rawContent)
+
+              // Build rich base details
+              function buildDetails(extra: Record<string, unknown> = {}): Record<string, unknown> {
+                return {
+                  file_path: filePath || null,
+                  model_id: ctx.agent || null,
+                  session_id: ctx.sessionID || null,
+                  message_id: ctx.messageID || null,
+                  project_root: filePath ? filePath.split("/").slice(0, -1).join("/") || null : null,
+                  content_hash: contentForHash,
+                  content_preview: rawContent.length > 200 ? rawContent.slice(0, 100) + "..." : rawContent,
+                  ...extra,
+                }
+              }
+
               // Step 1: Evaluate policy
               const policy = yield* security.evaluatePolicy(tool.id, {
                 sessionID: ctx.sessionID,
@@ -338,33 +361,55 @@ export const layer: Layer.Layer<
                 agent: ctx.agent,
               })
               if (policy.action === "deny") {
-                const eventId = yield* security.recordAuditEvent({
-                  eventType: "security.action_blocked",
+                yield* security.recordAuditEvent({
+                  eventType: "policy_blocked",
                   sessionId: ctx.sessionID,
-                  timestamp: Date.now(),
+                  timestamp: now,
+                  severity: "high",
                   toolName: tool.id,
                   modelId: ctx.agent,
+                  contentHash: contentForHash,
                   actionTaken: "blocked",
-                  details: { reason: policy.explanation, rule: policy.matchedRule },
+                  details: buildDetails({ reason: policy.explanation, rule: policy.matchedRule }),
                 })
                 return { title: `⛔ SECURITY BLOCKED (Policy): ${policy.explanation}`, output: `Blocked by security policy: ${policy.explanation}`, metadata: {} } as Tool.ExecuteResult
               }
 
+              // Record the event first so we can link scan results
+              const eventId = yield* security.recordAuditEvent({
+                eventType: tool.id === "shell" ? "command_scanned" : "file_write_scanned",
+                sessionId: ctx.sessionID,
+                timestamp: now,
+                severity: "info",
+                toolName: tool.id,
+                modelId: ctx.agent,
+                contentHash: contentForHash,
+                actionTaken: "allowed",
+                details: buildDetails({ status: "pending" }),
+              })
+
               // Step 2: Scan content for write/edit/patch tools
               if (tool.id === "write" || tool.id === "edit" || tool.id === "patch") {
-                const content = typeof args === "object" && args !== null ? JSON.stringify(args) : String(args)
-                const scanResult = yield* security.scanContent(content, { sessionID: ctx.sessionID, toolCallID: ctx.callID })
+                const scanResult = yield* security.scanContent(rawContent, { securityEventId: eventId, sessionID: ctx.sessionID, toolCallID: ctx.callID })
                 if (scanResult.action === "block") {
+                  const topFinding = scanResult.findings[0]
                   yield* security.recordAuditEvent({
-                    eventType: "security.action_blocked",
+                    eventType: "file_write_blocked",
                     sessionId: ctx.sessionID,
-                    timestamp: Date.now(),
+                    timestamp: now,
                     severity: scanResult.severity,
                     toolName: tool.id,
                     modelId: ctx.agent,
-                    contentHash: scanResult.matchedContent,
+                    contentHash: contentForHash,
                     actionTaken: "blocked",
-                    details: { findings: scanResult.findings, remediation: scanResult.remediation },
+                    details: buildDetails({
+                      status: "blocked",
+                      scanner: scanResult.scanner,
+                      rule_id: scanResult.ruleId,
+                      findings: scanResult.findings,
+                      remediation: scanResult.remediation,
+                      block_reason: topFinding ? `${topFinding.scanner} detected ${topFinding.severity} severity issue: ${topFinding.ruleId}` : "Content scan failed",
+                    }),
                   })
                   const blockedTitle = `⛔ SECURITY BLOCKED: ${scanResult.scanner} detected ${scanResult.severity}-severity issue`
                   const blockedOutput = [
@@ -378,34 +423,47 @@ export const layer: Layer.Layer<
                 }
                 if (scanResult.action === "warn") {
                   yield* security.recordAuditEvent({
-                    eventType: "security.action_approved",
+                    eventType: "file_write_warned",
                     sessionId: ctx.sessionID,
-                    timestamp: Date.now(),
+                    timestamp: now,
                     severity: scanResult.severity,
                     toolName: tool.id,
                     modelId: ctx.agent,
+                    contentHash: contentForHash,
                     actionTaken: "warned",
-                    details: { findings: scanResult.findings, remediation: scanResult.remediation },
+                    details: buildDetails({
+                      status: "warned",
+                      findings: scanResult.findings,
+                      remediation: scanResult.remediation,
+                    }),
                   })
                 }
               }
 
               // Step 3: Scan commands for shell tools
               if (tool.id === "shell") {
-                const command = typeof args === "object" && args !== null
-                  ? String((args as Record<string, unknown>).command ?? "")
-                  : String(args)
-                const scanResult = yield* security.scanCommand(command, { sessionID: ctx.sessionID, toolCallID: ctx.callID })
+                const commandStr = argsObj.command !== undefined ? String(argsObj.command) : String(args)
+                const scanResult = yield* security.scanCommand(commandStr, { securityEventId: eventId, sessionID: ctx.sessionID, toolCallID: ctx.callID })
                 if (scanResult.action === "block") {
+                  const topFinding = scanResult.findings[0]
                   yield* security.recordAuditEvent({
-                    eventType: "security.action_blocked",
+                    eventType: "command_blocked",
                     sessionId: ctx.sessionID,
-                    timestamp: Date.now(),
+                    timestamp: now,
                     severity: scanResult.severity,
                     toolName: tool.id,
                     modelId: ctx.agent,
+                    contentHash: contentForHash,
                     actionTaken: "blocked",
-                    details: { findings: scanResult.findings, remediation: scanResult.remediation },
+                    details: buildDetails({
+                      status: "blocked",
+                      scanner: scanResult.scanner,
+                      rule_id: scanResult.ruleId,
+                      command: commandStr.length > 500 ? commandStr.slice(0, 500) : commandStr,
+                      findings: scanResult.findings,
+                      remediation: scanResult.remediation,
+                      block_reason: topFinding ? `${topFinding.scanner} flagged command: ${topFinding.ruleId}` : "Command analysis failed",
+                    }),
                   })
                   const blockedTitle = `⛔ SECURITY BLOCKED: ${scanResult.scanner} flagged command`
                   const blockedOutput = [
@@ -422,13 +480,15 @@ export const layer: Layer.Layer<
               // Step 4: Execute the original tool
               const result = yield* originalExecute(args, ctx)
               yield* security.recordAuditEvent({
-                eventType: "security.action_approved",
+                eventType: tool.id === "shell" ? "command_completed" : "file_write_completed",
                 sessionId: ctx.sessionID,
-                timestamp: Date.now(),
+                timestamp: now,
+                severity: "info",
                 toolName: tool.id,
                 modelId: ctx.agent,
+                contentHash: contentForHash,
                 actionTaken: "allowed",
-                details: { title: result.title },
+                details: buildDetails({ status: "completed", title: result.title }),
               })
               return result
             }).pipe(Effect.orDie) as Effect.Effect<Tool.ExecuteResult>

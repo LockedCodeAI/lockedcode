@@ -113,7 +113,6 @@ export const layer = Layer.effect(
 
     const record = Effect.fn("Audit.record")(function* (event: SecurityEvent) {
       const id = Identifier.create("sec", "ascending")
-      const ch = hashContent(JSON.stringify(event.details ?? {}))
       const now = Date.now()
 
       db.insert(SecurityEventTable).values({
@@ -124,7 +123,7 @@ export const layer = Layer.effect(
         severity: event.severity ?? "info",
         tool_name: event.toolName ?? null,
         model_id: event.modelId ?? null,
-        content_hash: ch,
+        content_hash: event.contentHash ?? "",
         action_taken: event.actionTaken,
         details: event.details ?? null,
         time_created: now,
