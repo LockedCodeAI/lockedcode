@@ -331,72 +331,107 @@ export const layer: Layer.Layer<
           const originalExecute = tool.execute
           const execute = (args: unknown, ctx: Tool.Context<Record<string, unknown>>) =>
             Effect.gen(function* () {
-                  const policy = yield* security.evaluatePolicy(tool.id, {
-                    sessionID: ctx.sessionID,
-                    messageID: ctx.messageID,
-                    agent: ctx.agent,
+              // Step 1: Evaluate policy
+              const policy = yield* security.evaluatePolicy(tool.id, {
+                sessionID: ctx.sessionID,
+                messageID: ctx.messageID,
+                agent: ctx.agent,
+              })
+              if (policy.action === "deny") {
+                const eventId = yield* security.recordAuditEvent({
+                  eventType: "security.action_blocked",
+                  sessionId: ctx.sessionID,
+                  timestamp: Date.now(),
+                  toolName: tool.id,
+                  modelId: ctx.agent,
+                  actionTaken: "blocked",
+                  details: { reason: policy.explanation, rule: policy.matchedRule },
+                })
+                return { title: `⛔ SECURITY BLOCKED (Policy): ${policy.explanation}`, output: `Blocked by security policy: ${policy.explanation}`, metadata: {} } as Tool.ExecuteResult
+              }
+
+              // Step 2: Scan content for write/edit/patch tools
+              if (tool.id === "write" || tool.id === "edit" || tool.id === "patch") {
+                const content = typeof args === "object" && args !== null ? JSON.stringify(args) : String(args)
+                const scanResult = yield* security.scanContent(content, { sessionID: ctx.sessionID, toolCallID: ctx.callID })
+                if (scanResult.action === "block") {
+                  yield* security.recordAuditEvent({
+                    eventType: "security.action_blocked",
+                    sessionId: ctx.sessionID,
+                    timestamp: Date.now(),
+                    severity: scanResult.severity,
+                    toolName: tool.id,
+                    modelId: ctx.agent,
+                    contentHash: scanResult.matchedContent,
+                    actionTaken: "blocked",
+                    details: { findings: scanResult.findings, remediation: scanResult.remediation },
                   })
-                  if (policy.action === "deny") {
-                    yield* security.recordAuditEvent({
-                      eventType: "security.action_blocked",
-                      sessionId: ctx.sessionID,
-                      timestamp: Date.now(),
-                      toolName: tool.id,
-                      modelId: ctx.agent,
-                      actionTaken: "blocked",
-                      details: { reason: policy.explanation, rule: policy.matchedRule },
-                    })
-                    return { title: `Blocked by security policy: ${policy.explanation}`, output: "", metadata: {} }
-                  }
-                  if (tool.id === "write" || tool.id === "edit" || tool.id === "patch") {
-                    const content = typeof args === "object" && args !== null ? JSON.stringify(args) : String(args)
-                    const scanResult = yield* security.scanContent(content, { sessionID: ctx.sessionID, toolCallID: ctx.callID })
-                    if (scanResult.action === "block") {
-                      yield* security.recordAuditEvent({
-                        eventType: "security.action_blocked",
-                        sessionId: ctx.sessionID,
-                        timestamp: Date.now(),
-                        severity: scanResult.severity,
-                        toolName: tool.id,
-                        modelId: ctx.agent,
-                        contentHash: scanResult.matchedContent,
-                        actionTaken: "blocked",
-                        details: { findings: scanResult.findings, remediation: scanResult.remediation },
-                      })
-                      return { title: `Blocked by security scan: ${scanResult.remediation}`, output: "", metadata: {} }
-                    }
-                  }
-                  if (tool.id === "shell") {
-                    const command = typeof args === "object" && args !== null
-                      ? String((args as Record<string, unknown>).command ?? "")
-                      : String(args)
-                    const scanResult = yield* security.scanCommand(command, { sessionID: ctx.sessionID, toolCallID: ctx.callID })
-                    if (scanResult.action === "block") {
-                      yield* security.recordAuditEvent({
-                        eventType: "security.action_blocked",
-                        sessionId: ctx.sessionID,
-                        timestamp: Date.now(),
-                        severity: scanResult.severity,
-                        toolName: tool.id,
-                        modelId: ctx.agent,
-                        actionTaken: "blocked",
-                        details: { findings: scanResult.findings, remediation: scanResult.remediation },
-                      })
-                      return { title: `Blocked by security scan: ${scanResult.remediation}`, output: "", metadata: {} }
-                    }
-                  }
-                  const result = yield* originalExecute(args, ctx)
+                  const blockedTitle = `⛔ SECURITY BLOCKED: ${scanResult.scanner} detected ${scanResult.severity}-severity issue`
+                  const blockedOutput = [
+                    `Scanner: ${scanResult.scanner}`,
+                    `Rule: ${scanResult.ruleId}`,
+                    `Severity: ${scanResult.severity}`,
+                    scanResult.remediation ? `\n${scanResult.remediation}` : "",
+                    scanResult.findings.length > 0 ? `\nFindings: ${scanResult.findings.map((f) => `${f.ruleId} (${f.severity})`).join(", ")}` : "",
+                  ].join("\n")
+                  return { title: blockedTitle, output: blockedOutput, metadata: {} } as Tool.ExecuteResult
+                }
+                if (scanResult.action === "warn") {
                   yield* security.recordAuditEvent({
                     eventType: "security.action_approved",
                     sessionId: ctx.sessionID,
                     timestamp: Date.now(),
+                    severity: scanResult.severity,
                     toolName: tool.id,
                     modelId: ctx.agent,
-                    actionTaken: "allowed",
-                    details: { title: result.title },
+                    actionTaken: "warned",
+                    details: { findings: scanResult.findings, remediation: scanResult.remediation },
                   })
-                  return result
-                }).pipe(Effect.orDie) as Effect.Effect<Tool.ExecuteResult>
+                }
+              }
+
+              // Step 3: Scan commands for shell tools
+              if (tool.id === "shell") {
+                const command = typeof args === "object" && args !== null
+                  ? String((args as Record<string, unknown>).command ?? "")
+                  : String(args)
+                const scanResult = yield* security.scanCommand(command, { sessionID: ctx.sessionID, toolCallID: ctx.callID })
+                if (scanResult.action === "block") {
+                  yield* security.recordAuditEvent({
+                    eventType: "security.action_blocked",
+                    sessionId: ctx.sessionID,
+                    timestamp: Date.now(),
+                    severity: scanResult.severity,
+                    toolName: tool.id,
+                    modelId: ctx.agent,
+                    actionTaken: "blocked",
+                    details: { findings: scanResult.findings, remediation: scanResult.remediation },
+                  })
+                  const blockedTitle = `⛔ SECURITY BLOCKED: ${scanResult.scanner} flagged command`
+                  const blockedOutput = [
+                    `Scanner: ${scanResult.scanner}`,
+                    `Rule: ${scanResult.ruleId}`,
+                    `Severity: ${scanResult.severity}`,
+                    scanResult.remediation ? `\n${scanResult.remediation}` : "",
+                    scanResult.findings.length > 0 ? `\nFindings: ${scanResult.findings.map((f) => `${f.ruleId} (${f.severity})`).join(", ")}` : "",
+                  ].join("\n")
+                  return { title: blockedTitle, output: blockedOutput, metadata: {} } as Tool.ExecuteResult
+                }
+              }
+
+              // Step 4: Execute the original tool
+              const result = yield* originalExecute(args, ctx)
+              yield* security.recordAuditEvent({
+                eventType: "security.action_approved",
+                sessionId: ctx.sessionID,
+                timestamp: Date.now(),
+                toolName: tool.id,
+                modelId: ctx.agent,
+                actionTaken: "allowed",
+                details: { title: result.title },
+              })
+              return result
+            }).pipe(Effect.orDie) as Effect.Effect<Tool.ExecuteResult>
 
           return {
             id: tool.id,

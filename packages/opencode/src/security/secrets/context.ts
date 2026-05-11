@@ -88,13 +88,20 @@ export function adjustSeverity(
   // Check for placeholder values
   if (isPlaceholder(value)) return "suppress"
 
-  // Check surrounding line for placeholder indicators
+  // Check surrounding line for placeholder indicators — only suppress when the
+  // line content describes a placeholder or example, not when words like "test"
+  // appear in file paths or secret values themselves.
+  const placeholderIndicators = /placeholder|dummy|fake|TODO|FIXME/i
+  const exampleIndicators = /\bexample\b/i
   if (
-    /example|test|placeholder|dummy|fake|sample|TODO|FIXME/i.test(lineContent) &&
-    !/real|actual|live|prod/i.test(lineContent)
+    (placeholderIndicators.test(lineContent) || (exampleIndicators.test(lineContent) && !/real|actual|live|prod/i.test(lineContent)))
   ) {
-    // Line has example/test indicators — suppress unless it says "real" or "live"
     return "suppress"
+  }
+  // Suppress patterns that are explicitly marked as test-only values
+  if (/test[-_]?(value|key|token|secret|api)/i.test(lineContent) && !/real|actual|live|prod/i.test(lineContent)) {
+    // Only suppress if the match itself contains "test" — not if "test" is just in the file path
+    if (/test[-_]/i.test(value)) return "suppress"
   }
 
   // Check variable name context

@@ -29,7 +29,9 @@ export function SecretScanner(): Effect.Effect<Scanner> {
       for (const pattern of SECRET_PATTERNS) {
         for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
           const line = lines[lineIdx]
-          const matches = line.matchAll(pattern.regex)
+          // Ensure regex has global flag for matchAll, create a copy if needed
+          const regex = pattern.regex.global ? pattern.regex : new RegExp(pattern.regex.source, pattern.regex.flags + "g")
+          const matches = line.matchAll(regex)
 
           for (const match of matches) {
             const value = match[0]

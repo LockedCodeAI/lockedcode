@@ -31,7 +31,7 @@ export interface SessionSummary {
 export interface Interface {
   readonly record: (event: SecurityEvent) => Effect.Effect<string>
   readonly recordScanResult: (scanResult: {
-    securityEventId: string
+    securityEventId: string | null
     scannerName: string
     ruleId: string
     severity: Severity
@@ -84,7 +84,7 @@ export const layer = Layer.effect(
       db.run(`
         CREATE TABLE IF NOT EXISTS scan_result (
           id TEXT PRIMARY KEY,
-          security_event_id TEXT NOT NULL REFERENCES security_event(id) ON DELETE CASCADE,
+          security_event_id TEXT REFERENCES security_event(id) ON DELETE CASCADE,
           scanner_name TEXT NOT NULL,
           rule_id TEXT NOT NULL,
           severity TEXT NOT NULL,
@@ -135,7 +135,7 @@ export const layer = Layer.effect(
     })
 
     const recordScanResult = Effect.fn("Audit.recordScanResult")(function* (sr: {
-      securityEventId: string
+      securityEventId: string | null
       scannerName: string
       ruleId: string
       severity: Severity

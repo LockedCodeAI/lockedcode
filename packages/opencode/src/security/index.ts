@@ -31,7 +31,7 @@ export interface Interface {
   readonly scanOutbound: (content: string, metadata: Record<string, unknown>) => Effect.Effect<DLPResult>
   readonly evaluatePolicy: (action: string, context: Record<string, unknown>) => Effect.Effect<PolicyDecision>
   readonly scoreTrust: (action: string, context: Record<string, unknown>) => Effect.Effect<TrustScore>
-  readonly recordAuditEvent: (event: SecurityEventData) => Effect.Effect<void>
+  readonly recordAuditEvent: (event: SecurityEventData) => Effect.Effect<string>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@lockedcode/Security") {}
@@ -79,6 +79,18 @@ export const layer = Layer.effect(
         operation: "write",
       }
       const result = yield* scanning.scan(content, scanMeta)
+      const secEventId: string | null = null
+      for (const finding of result.findings) {
+        yield* audit.recordScanResult({
+          securityEventId: secEventId,
+          scannerName: finding.scanner ?? result.scanner,
+          ruleId: finding.ruleId,
+          severity: finding.severity,
+          matchedContent: finding.matchedContent,
+          lineNumber: finding.lineNumber,
+          remediation: finding.remediation,
+        })
+      }
       return result
     })
 
@@ -100,6 +112,18 @@ export const layer = Layer.effect(
           (f) => !analysis.findings.some((af) => af.ruleId === f.ruleId),
         ),
       ]
+      const secEventId = (metadata.securityEventId as string) ?? ""
+      for (const finding of mergedFindings) {
+        yield* audit.recordScanResult({
+          securityEventId: secEventId,
+          scannerName: finding.scanner ?? "command-analyzer",
+          ruleId: finding.ruleId,
+          severity: finding.severity,
+          matchedContent: finding.matchedContent,
+          lineNumber: finding.lineNumber,
+          remediation: finding.remediation,
+        })
+      }
       const severityOrder: Array<"info" | "warning" | "high" | "critical"> = ["info", "warning", "high", "critical"]
       const highestSeverity = severityOrder.reduce((highest, sev) =>
         mergedFindings.some((f) => f.severity === sev) ? sev : highest, "info" as const)
@@ -148,7 +172,7 @@ export const layer = Layer.effect(
 
     const recordAuditEvent = Effect.fn("Security.recordAuditEvent")(function* (event: SecurityEventData) {
       log.debug("recordAuditEvent called", { eventType: event.eventType })
-      yield* audit.record(event)
+      return yield* audit.record(event)
     })
 
     return Service.of({
@@ -199,6 +223,18 @@ export const busLayer = Layer.effect(
         operation: "write",
       }
       const result = yield* scanning.scan(content, scanMeta)
+      const secEventId: string | null = null
+      for (const finding of result.findings) {
+        yield* audit.recordScanResult({
+          securityEventId: secEventId,
+          scannerName: finding.scanner ?? result.scanner,
+          ruleId: finding.ruleId,
+          severity: finding.severity,
+          matchedContent: finding.matchedContent,
+          lineNumber: finding.lineNumber,
+          remediation: finding.remediation,
+        })
+      }
       yield* bus.publish(SecurityEvent.ScanCompleted, {
         sessionID: String(metadata.sessionID ?? ""),
         findings: [],
@@ -226,6 +262,18 @@ export const busLayer = Layer.effect(
           (f) => !analysis.findings.some((af) => af.ruleId === f.ruleId),
         ),
       ]
+      const secEventId: string | null = null
+      for (const finding of mergedFindings) {
+        yield* audit.recordScanResult({
+          securityEventId: secEventId,
+          scannerName: finding.scanner ?? "command-analyzer",
+          ruleId: finding.ruleId,
+          severity: finding.severity,
+          matchedContent: finding.matchedContent,
+          lineNumber: finding.lineNumber,
+          remediation: finding.remediation,
+        })
+      }
       const severityOrder: Array<"info" | "warning" | "high" | "critical"> = ["info", "warning", "high", "critical"]
       const highestSeverity = severityOrder.reduce((highest, sev) =>
         mergedFindings.some((f) => f.severity === sev) ? sev : highest, "info" as const)
@@ -281,7 +329,7 @@ export const busLayer = Layer.effect(
 
     const recordAuditEvent = Effect.fn("Security.recordAuditEvent")(function* (event: SecurityEventData) {
       log.debug("recordAuditEvent called", { eventType: event.eventType })
-      yield* audit.record(event)
+      return yield* audit.record(event)
     })
 
     return Service.of({

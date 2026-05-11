@@ -171,7 +171,7 @@ export interface SecurityEvent {
   readonly toolName: string
   readonly modelId: string
   readonly contentHash?: string
-  readonly actionTaken: "allowed" | "blocked" | "overridden" | "redacted"
+  readonly actionTaken: "allowed" | "blocked" | "warned" | "overridden" | "redacted"
   readonly details: Record<string, unknown>
 }
 

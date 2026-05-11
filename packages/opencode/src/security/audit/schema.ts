@@ -37,7 +37,6 @@ export const ScanResultTable = sqliteTable(
   {
     id: text().primaryKey(),
     security_event_id: text()
-      .notNull()
       .references(() => SecurityEventTable.id, { onDelete: "cascade" }),
     scanner_name: text().notNull(),
     rule_id: text().notNull(),
