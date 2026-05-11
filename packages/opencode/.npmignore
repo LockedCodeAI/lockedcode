@@ -26,6 +26,8 @@ src/security/__tests__/
 .github/
 .husky/
 .opencode/
+.idea/
+.turbo/
 .scribe-history/
 .editorconfig
 .oxlintrc.json
@@ -50,6 +52,9 @@ src/provider/models-snapshot.js
 
 # TUI audio assets (not needed for headless CLI)
 src/cli/cmd/tui/asset/*.wav
+
+# Bun build cache (60 MB each, hundreds of these)
+.*.bun-build
 
 # Build output
 dist/
