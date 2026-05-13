@@ -10,7 +10,8 @@ import { Service as SecurityConfigService, defaultLayer as SecurityConfigLayer }
 const log = Log.create({ service: "confinement" })
 
 /** Mutable escape record for internal use. */
-interface MutableEscape extends EscapeRequest {
+interface MutableEscape extends Omit<EscapeRequest, "status"> {
+  status: EscapeRequest["status"]
   resolve: (approved: boolean) => void
 }
 
@@ -115,28 +116,30 @@ export const layer = Layer.effect(
         sessionId: "unknown",
         contentHash: "",
         status: "pending" as const,
-        resolve: () => {},
+        resolve: () => {}, // placeholder — replaced when a caller awaits approval
       }
 
       pendingEscapes.set(escapeId, escape)
 
       if (strictness === "strict") {
-        ;(escape as any).status = "denied"
+        escape.status = "denied"
         escape.resolve(false)
+        pendingEscapes.delete(escapeId)
         log.warn("escape request denied (strict mode)", { path: canon, operation, reason })
-        return { id: escapeId, path: canon, operation, reason, modelId: "unknown", sessionId: "unknown", contentHash: "", status: "denied" as const } as EscapeRequest
+        return { ...escape, status: "denied" as const } satisfies EscapeRequest
       }
 
       if (strictness === "permissive") {
-        ;(escape as any).status = "approved"
+        escape.status = "approved"
         escape.resolve(true)
+        pendingEscapes.delete(escapeId)
         log.warn("escape request auto-approved (permissive mode)", { path: canon, operation, reason })
-        return { id: escapeId, path: canon, operation, reason, modelId: "unknown", sessionId: "unknown", contentHash: "", status: "approved" as const } as EscapeRequest
+        return { ...escape, status: "approved" as const } satisfies EscapeRequest
       }
 
       // Standard mode: leave pending for explicit user approval via approveEscape/denyEscape
       log.warn("escape request pending user approval", { path: canon, operation, reason })
-      return { id: escapeId, path: canon, operation, reason, modelId: "unknown", sessionId: "unknown", contentHash: "", status: "pending" as const } as EscapeRequest
+      return { ...escape, status: "pending" as const } satisfies EscapeRequest
     })
 
     const approveEscape = Effect.fn("Confinement.approveEscape")(function* (escapeId: string) {
@@ -144,8 +147,9 @@ export const layer = Layer.effect(
       if (!escape) {
         return { allowed: false, path: "", operation: "read", reason: "escape request not found", escapable: false } as ConfinementResult
       }
-      ;(escape as any).status = "approved"
+      escape.status = "approved"
       escape.resolve(true)
+      pendingEscapes.delete(escapeId)
       log.info("escape approved", { path: escape.path, operation: escape.operation })
       return {
         allowed: true,
@@ -161,8 +165,9 @@ export const layer = Layer.effect(
       if (!escape) {
         return { allowed: false, path: "", operation: "read", reason: "escape request not found", escapable: false } as ConfinementResult
       }
-      ;(escape as any).status = "denied"
+      escape.status = "denied"
       escape.resolve(false)
+      pendingEscapes.delete(escapeId)
       log.info("escape denied", { path: escape.path, operation: escape.operation, reason })
       return {
         allowed: false,
