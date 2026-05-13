@@ -64,16 +64,18 @@ export function DialogTemplate(props: DialogTemplateProps) {
   const project = useProject()
   dialog.setSize("large")
 
-  const [templates] = createResource(async () => {
-    const cwd = sdk.directory || process.cwd()
-    const worktree = project.instance.path().worktree
+  const [templates] = createResource(
+    () => project.instance.path().worktree || sdk.directory || process.cwd(),
+    async (worktree) => {
+      const cwd = sdk.directory || process.cwd()
 
-    const dirs = [path.join(Global.Path.config, "templates")]
-    if (worktree) dirs.push(path.join(worktree, "templates"))
-    if (cwd !== worktree) dirs.push(path.join(cwd, "templates"))
+      const dirs = [path.join(Global.Path.config, "templates")]
+      dirs.push(path.join(worktree, "templates"))
+      if (cwd !== worktree) dirs.push(path.join(cwd, "templates"))
 
-    return scanTemplates(dirs)
-  })
+      return scanTemplates(dirs)
+    },
+  )
 
   const options = createMemo<DialogSelectOption<TemplateInfo>[]>(() => {
     const list = templates() ?? []
