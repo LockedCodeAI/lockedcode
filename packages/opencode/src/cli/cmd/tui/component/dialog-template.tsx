@@ -2,11 +2,17 @@ import { DialogSelect, type DialogSelectOption } from "@tui/ui/dialog-select"
 import { createResource, createMemo } from "solid-js"
 import { useDialog } from "@tui/ui/dialog"
 import { useProject } from "@tui/context/project"
+import { useSync } from "@tui/context/sync"
 import { useSDK } from "@tui/context/sdk"
 import { Glob } from "@opencode-ai/core/util/glob"
 import { ConfigMarkdown } from "@/config/markdown"
 import { Global } from "@opencode-ai/core/global"
+import * as Log from "@opencode-ai/core/util/log"
 import path from "path"
+import fs from "fs/promises"
+
+const log = Log.create({ service: "templates" })
+const cacheDir = path.join(Global.Path.cache, "templates")
 
 interface TemplateInfo {
   name: string
@@ -19,7 +25,106 @@ export type DialogTemplateProps = {
   onSelect: (template: TemplateInfo) => void
 }
 
-async function scanTemplates(dirs: string[]): Promise<TemplateInfo[]> {
+interface RemoteIndex {
+  templates: Array<{ name: string; files: string[] }>
+}
+
+async function fetchRemoteTemplates(urls: string[]): Promise<TemplateInfo[]> {
+  const results: TemplateInfo[] = []
+
+  for (const rawUrl of urls) {
+    const base = rawUrl.endsWith("/") ? rawUrl : `${rawUrl}/`
+    const indexUrl = new URL("index.json", base).href
+
+    try {
+      const res = await fetch(indexUrl)
+      if (!res.ok) {
+        log.warn("failed to fetch template index", { url: indexUrl, status: res.status })
+        continue
+      }
+      const data = (await res.json()) as RemoteIndex
+      if (!Array.isArray(data.templates)) continue
+
+      for (const entry of data.templates) {
+        const mdFile = entry.files?.find((f) => f.endsWith(".md"))
+        if (!mdFile) continue
+
+        const fileUrl = new URL(`${entry.name}/${mdFile}`, base).href
+        const dest = path.join(cacheDir, entry.name, mdFile)
+
+        try {
+          await fs.mkdir(path.dirname(dest), { recursive: true })
+
+          const fileRes = await fetch(fileUrl)
+          if (!fileRes.ok) {
+            log.warn("failed to download template", { url: fileUrl, status: fileRes.status })
+            continue
+          }
+          const content = await fileRes.text()
+          await fs.writeFile(dest, content)
+
+          const md = await ConfigMarkdown.parse(dest)
+          const frontmatter = md.data as Record<string, unknown>
+          const name = typeof frontmatter.name === "string" ? frontmatter.name : entry.name
+          const description =
+            typeof frontmatter.description === "string" ? frontmatter.description : undefined
+
+          results.push({
+            name,
+            description,
+            content: md.content.trim(),
+            path: dest,
+          })
+        } catch (err) {
+          log.warn("failed to process remote template", { name: entry.name, err })
+          // Try cached version
+          try {
+            const md = await ConfigMarkdown.parse(dest)
+            const frontmatter = md.data as Record<string, unknown>
+            results.push({
+              name: typeof frontmatter.name === "string" ? frontmatter.name : entry.name,
+              description:
+                typeof frontmatter.description === "string" ? frontmatter.description : undefined,
+              content: md.content.trim(),
+              path: dest,
+            })
+          } catch {
+            continue
+          }
+        }
+      }
+    } catch (err) {
+      log.warn("failed to fetch template index", { url: indexUrl, err })
+
+      // Fall back to any cached templates from this URL
+      try {
+        const cached = await Glob.scan("*/*.md", { cwd: cacheDir, absolute: true, include: "file" })
+        for (const match of cached) {
+          try {
+            const md = await ConfigMarkdown.parse(match)
+            const frontmatter = md.data as Record<string, unknown>
+            const filename = path.basename(match, ".md")
+            results.push({
+              name: typeof frontmatter.name === "string" ? frontmatter.name : filename,
+              description:
+                typeof frontmatter.description === "string" ? frontmatter.description : undefined,
+              content: md.content.trim(),
+              path: match,
+            })
+          } catch {
+            continue
+          }
+        }
+      } catch {
+        continue
+      }
+    }
+  }
+
+  return results
+}
+
+async function scanLocalTemplates(dirs: string[]): Promise<TemplateInfo[]> {
   const seen = new Map<string, TemplateInfo>()
 
   for (const dir of dirs) {
@@ -55,13 +160,14 @@ async function scanTemplates(dirs: string[]): Promise<TemplateInfo[]> {
     }
   }
 
-  return Array.from(seen.values()).sort((a, b) => a.name.localeCompare(b.name))
+  return Array.from(seen.values())
 }
 
 export function DialogTemplate(props: DialogTemplateProps) {
   const dialog = useDialog()
   const sdk = useSDK()
   const project = useProject()
+  const sync = useSync()
   dialog.setSize("large")
 
   const [templates] = createResource(
@@ -69,11 +175,24 @@ export function DialogTemplate(props: DialogTemplateProps) {
     async (worktree) => {
       const cwd = sdk.directory || process.cwd()
 
-      const dirs = [path.join(Global.Path.config, "templates")]
-      dirs.push(path.join(worktree, "templates"))
-      if (cwd !== worktree) dirs.push(path.join(cwd, "templates"))
+      // Remote templates (lowest precedence)
+      const urls = (sync.data.config as Record<string, unknown>).templates as
+        | { urls?: string[] }
+        | undefined
+      const remote = urls?.urls?.length ? await fetchRemoteTemplates(urls.urls) : []
 
-      return scanTemplates(dirs)
+      // Local templates (highest precedence — project overrides global overrides remote)
+      const localDirs = [path.join(Global.Path.config, "templates")]
+      localDirs.push(path.join(worktree, "templates"))
+      if (cwd !== worktree) localDirs.push(path.join(cwd, "templates"))
+      const local = await scanLocalTemplates(localDirs)
+
+      // Merge: local wins on name collision
+      const merged = new Map<string, TemplateInfo>()
+      for (const t of remote) merged.set(t.name, t)
+      for (const t of local) merged.set(t.name, t)
+
+      return Array.from(merged.values()).sort((a, b) => a.name.localeCompare(b.name))
     },
   )
 
