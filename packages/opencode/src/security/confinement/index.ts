@@ -1,8 +1,7 @@
 import { Context, Effect, Layer } from "effect"
 import * as Log from "@opencode-ai/core/util/log"
 import os from "os"
-import type { ConfinementResult, EscapeRequest } from "../types"
-import { defaultSecurityConfig } from "../types"
+import type { ConfinementResult, EscapeRequest, SecurityStrictness } from "../types"
 import { detectProjectRoot } from "./root"
 import { canonicalize, isSubPath } from "./paths"
 import { Identifier } from "@/id/id"
@@ -105,6 +104,7 @@ export const layer = Layer.effect(
     ) {
       const canon = canonicalize(path, cwd)
       const escapeId = Identifier.create("esc", "ascending")
+      const strictness: SecurityStrictness = cfg.strictness
 
       const escape: MutableEscape = {
         id: escapeId,
@@ -120,19 +120,23 @@ export const layer = Layer.effect(
 
       pendingEscapes.set(escapeId, escape)
 
-      // Auto-approve for now (full UX integration deferred — see report notes)
-      log.warn("escape hatch triggered (auto-approved — UX integration pending)", {
-        path: canon,
-        operation,
-        reason,
-      })
-
-      const entry = pendingEscapes.get(escapeId)
-      if (entry) {
-        ;(entry as any).status = "approved"
-        entry.resolve(true)
+      if (strictness === "strict") {
+        ;(escape as any).status = "denied"
+        escape.resolve(false)
+        log.warn("escape request denied (strict mode)", { path: canon, operation, reason })
+        return { id: escapeId, path: canon, operation, reason, modelId: "unknown", sessionId: "unknown", contentHash: "", status: "denied" as const } as EscapeRequest
       }
-      return { id: escapeId, path: canon, operation, reason, modelId: "unknown", sessionId: "unknown", contentHash: "", status: "approved" as const } as EscapeRequest
+
+      if (strictness === "permissive") {
+        ;(escape as any).status = "approved"
+        escape.resolve(true)
+        log.warn("escape request auto-approved (permissive mode)", { path: canon, operation, reason })
+        return { id: escapeId, path: canon, operation, reason, modelId: "unknown", sessionId: "unknown", contentHash: "", status: "approved" as const } as EscapeRequest
+      }
+
+      // Standard mode: leave pending for explicit user approval via approveEscape/denyEscape
+      log.warn("escape request pending user approval", { path: canon, operation, reason })
+      return { id: escapeId, path: canon, operation, reason, modelId: "unknown", sessionId: "unknown", contentHash: "", status: "pending" as const } as EscapeRequest
     })
 
     const approveEscape = Effect.fn("Confinement.approveEscape")(function* (escapeId: string) {
