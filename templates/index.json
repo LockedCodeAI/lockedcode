@@ -1,5 +1,6 @@
 {
   "templates": [
+    { "name": "hello-world", "files": ["hello-world.md"] },
     { "name": "code-review", "files": ["code-review.md"] },
     { "name": "security-audit", "files": ["security-audit.md"] }
   ]
