@@ -2,8 +2,9 @@ import { describe, expect, test } from "bun:test"
 import { Effect, Layer } from "effect"
 import { testEffect } from "../../../test/lib/effect"
 import { Security } from "../index"
-import { Service as ConfinementService } from "../confinement"
-import { defaultSecurityConfig, type Severity } from "../types"
+import { Service as ConfinementService, layer as confinementRawLayer, type Interface as ConfinementInterface } from "../confinement"
+import { Service as SecurityConfigService } from "../config"
+import { defaultSecurityConfig, type SecurityConfig, type Severity } from "../types"
 import type { ScanMetadata } from "../types"
 import { analyzeCommand } from "../scanning/command-analyzer"
 import { detectEntropySecrets } from "../secrets/entropy-secrets"
@@ -413,4 +414,87 @@ describe("full pipeline verification", () => {
       expect(policy.action).toBe("deny")
     }),
   )
+})
+
+// ============================================================
+// 11. Escape Hatch Policy Enforcement
+// ============================================================
+
+function makeConfinementLayer(strictness: "strict" | "standard" | "permissive") {
+  const cfg: SecurityConfig = { ...defaultSecurityConfig, strictness }
+  const configLayer = Layer.succeed(SecurityConfigService, SecurityConfigService.of({ get: () => cfg }))
+  return confinementRawLayer.pipe(Layer.provide(configLayer))
+}
+
+function runWithStrictness<A>(strictness: "strict" | "standard" | "permissive", fn: (svc: ConfinementInterface) => Effect.Effect<A>) {
+  return Effect.gen(function* () {
+    const svc: ConfinementInterface = yield* ConfinementService
+    return yield* fn(svc)
+  }).pipe(Effect.provide(makeConfinementLayer(strictness)), Effect.runPromise)
+}
+
+describe("escape hatch policy enforcement", () => {
+  test("strict mode: requestEscape returns denied", async () => {
+    const result = await runWithStrictness("strict", (svc) =>
+      svc.requestEscape("/etc/passwd", "read", "need system info"),
+    )
+    expect(result.status).toBe("denied")
+  })
+
+  test("standard mode: requestEscape returns pending (not auto-approved)", async () => {
+    const result = await runWithStrictness("standard", (svc) =>
+      svc.requestEscape("/etc/passwd", "read", "need system info"),
+    )
+    expect(result.status).toBe("pending")
+  })
+
+  test("permissive mode: requestEscape returns approved", async () => {
+    const result = await runWithStrictness("permissive", (svc) =>
+      svc.requestEscape("/etc/passwd", "read", "need system info"),
+    )
+    expect(result.status).toBe("approved")
+  })
+
+  test("approveEscape resolves a pending escape", async () => {
+    const result = await runWithStrictness("standard", (svc) =>
+      Effect.gen(function* () {
+        const escape = yield* svc.requestEscape("/outside/path", "write", "test")
+        expect(escape.status).toBe("pending")
+        const approved = yield* svc.approveEscape(escape.id)
+        expect(approved.allowed).toBe(true)
+        expect(approved.reason).toBe("escape approved")
+        return approved
+      }),
+    )
+    expect(result.allowed).toBe(true)
+  })
+
+  test("denyEscape resolves a pending escape as denied", async () => {
+    const result = await runWithStrictness("standard", (svc) =>
+      Effect.gen(function* () {
+        const escape = yield* svc.requestEscape("/outside/path", "write", "test")
+        expect(escape.status).toBe("pending")
+        const denied = yield* svc.denyEscape(escape.id, "not authorized")
+        expect(denied.allowed).toBe(false)
+        expect(denied.reason).toBe("not authorized")
+        return denied
+      }),
+    )
+    expect(result.allowed).toBe(false)
+  })
+
+  test("checkPath returns escapable for paths outside project root", async () => {
+    const result = await runWithStrictness("standard", (svc) =>
+      svc.checkPath("/etc/passwd", "read"),
+    )
+    expect(result.allowed).toBe(false)
+    expect(result.escapable).toBe(true)
+  })
+
+  test("checkPath allows paths inside project root", async () => {
+    const result = await runWithStrictness("standard", (svc) =>
+      svc.checkPath(process.cwd(), "write"),
+    )
+    expect(result.allowed).toBe(true)
+  })
 })

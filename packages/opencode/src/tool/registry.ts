@@ -388,6 +388,34 @@ export const layer: Layer.Layer<
                 details: buildDetails({ status: "pending" }),
               })
 
+              // Step 1.5: Confinement check for file-write tools
+              if ((tool.id === "write" || tool.id === "edit" || tool.id === "patch") && filePath) {
+                const confinement = yield* security.checkConfinement(filePath, "write")
+                if (!confinement.allowed) {
+                  yield* security.recordAuditEvent({
+                    eventType: "file_write_blocked",
+                    sessionId: ctx.sessionID,
+                    timestamp: now,
+                    severity: "high",
+                    toolName: tool.id,
+                    modelId: ctx.agent,
+                    contentHash: contentForHash,
+                    actionTaken: "blocked",
+                    details: buildDetails({
+                      status: "blocked",
+                      block_reason: `Confinement: ${confinement.reason}`,
+                      path: confinement.path,
+                      escapable: confinement.escapable,
+                    }),
+                  })
+                  return {
+                    title: `⛔ SECURITY BLOCKED (Confinement): path outside project root`,
+                    output: `Blocked by directory confinement: ${confinement.reason}\nPath: ${confinement.path}`,
+                    metadata: {},
+                  } as Tool.ExecuteResult
+                }
+              }
+
               // Step 2: Scan content for write/edit/patch tools
               if (tool.id === "write" || tool.id === "edit" || tool.id === "patch") {
                 const scanResult = yield* security.scanContent(rawContent, { securityEventId: eventId, sessionID: ctx.sessionID, toolCallID: ctx.callID })
