@@ -19,7 +19,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  publish:
+  resolve-version:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -37,8 +37,12 @@ jobs:
             exit 1
           fi
           echo "version=$V" >> "$GITHUB_OUTPUT"
-          echo "Publishing version $V"
+          echo "Releasing version $V"
 
+  publish:
+    needs: resolve-version
+    runs-on: ubuntu-latest
+    steps:
       - uses: actions/checkout@v4
 
       - uses: ./.github/actions/setup-bun
@@ -51,7 +55,7 @@ jobs:
       - name: Check if already published
         id: check
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
+          VERSION="${{ needs.resolve-version.outputs.version }}"
           if npm view "lockedcode@${VERSION}" version 2>/dev/null; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
             echo "lockedcode@${VERSION} already published — skipping"
@@ -63,7 +67,7 @@ jobs:
         if: steps.check.outputs.skip == 'false'
         working-directory: packages/opencode
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
+          VERSION="${{ needs.resolve-version.outputs.version }}"
           bun -e "
             const text = await Bun.file('package.json').text()
             await Bun.write('package.json', text.replace(/\"version\": \"[^\"]+\"/, '\"version\": \"${VERSION}\"'))
@@ -78,8 +82,43 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+  build-binaries:
+    needs: resolve-version
+    runs-on: ubuntu-latest
+    env:
+      OPENCODE_VERSION: ${{ needs.resolve-version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-bun
+
+      - name: Build CLI for all platforms
+        working-directory: packages/opencode
+        run: bun ./script/build.ts --skip-embed-web-ui
+
+      - name: Archive binaries
+        working-directory: packages/opencode
+        run: |
+          for dir in dist/*/; do
+            name=$(basename "$dir")
+            if echo "$name" | grep -q "linux"; then
+              tar -czf "dist/${name}.tar.gz" -C "${dir}bin" .
+            else
+              (cd "${dir}bin" && zip -r "../../${name}.zip" .)
+            fi
+          done
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-binaries
+          path: |
+            packages/opencode/dist/*.tar.gz
+            packages/opencode/dist/*.zip
+          retention-days: 5
+
   github-release:
-    needs: publish
+    needs: [resolve-version, publish, build-binaries]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -89,16 +128,23 @@ jobs:
       - name: Create tag (workflow_dispatch only)
         if: github.event_name == 'workflow_dispatch'
         run: |
-          VERSION="${{ needs.publish.outputs.version }}"
+          VERSION="${{ needs.resolve-version.outputs.version }}"
           git tag "v${VERSION}"
           git push origin "v${VERSION}"
 
+      - name: Download binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: cli-binaries
+          path: binaries
+
       - name: Create GitHub Release
         run: |
-          VERSION="${{ needs.publish.outputs.version }}"
+          VERSION="${{ needs.resolve-version.outputs.version }}"
           gh release create "v${VERSION}" \
             --title "v${VERSION}" \
             --generate-notes \
-            --latest
+            --latest \
+            binaries/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
