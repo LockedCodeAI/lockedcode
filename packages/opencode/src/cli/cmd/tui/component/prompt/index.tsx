@@ -49,6 +49,7 @@ import { useToast } from "../../ui/toast"
 import { useKV } from "../../context/kv"
 import { createFadeIn } from "../../util/signal"
 import { DialogSkill } from "../dialog-skill"
+import { DialogTemplate } from "../dialog-template"
 import {
   confirmWorkspaceFileChanges,
   openWorkspaceSelect,
@@ -592,6 +593,26 @@ export function Prompt(props: PromptProps) {
                   parts: [],
                 })
                 input.gotoBufferEnd()
+              }}
+            />
+          ))
+        },
+      },
+      {
+        title: "Templates",
+        name: "prompt.templates",
+        category: "Prompt",
+        slashName: "templates",
+        run: () => {
+          dialog.replace(() => (
+            <DialogTemplate
+              onSelect={(template) => {
+                input.setText(template.content)
+                setStore("prompt", {
+                  input: template.content,
+                  parts: [],
+                })
+                queueMicrotask(() => void submit())
               }}
             />
           ))
