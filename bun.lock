@@ -360,9 +360,9 @@
     },
     "packages/opencode": {
       "name": "lockedcode",
-      "version": "1.14.44",
+      "version": "1.1.1",
       "bin": {
-        "lockedcode": "./bin/lockedcode",
+        "lockedcode": "bin/lockedcode",
       },
       "dependencies": {
         "@actions/core": "1.11.1",
