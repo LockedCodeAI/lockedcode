@@ -1,0 +1,1218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LockedCode — App Flows & Architecture</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0f1117;color:#e2e8f0;font-family:Inter,system-ui,sans-serif;overflow:hidden;height:100vh;display:flex;flex-direction:column}
+#topbar{display:flex;align-items:center;gap:12px;padding:10px 20px;background:#181b24;border-bottom:1px solid #2a2f3f;flex-shrink:0}
+#topbar .app-title{font-weight:600;font-size:15px;color:#f1f5f9;white-space:nowrap}
+#topbar .app-title span{color:#5b8af4}
+#topbar .search-wrap{flex:1;max-width:400px;position:relative}
+#topbar .search-wrap input{width:100%;padding:6px 10px 6px 30px;border-radius:6px;border:1px solid #2a2f3f;background:#1e2230;color:#e2e8f0;font-size:13px;outline:none}
+#topbar .search-wrap input:focus{border-color:#5b8af4}
+#topbar .search-wrap .search-icon{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:#64748b;font-size:13px}
+#topbar .view-tabs{display:flex;gap:4px;margin-left:auto}
+#topbar .view-tab{padding:6px 14px;border-radius:6px;border:1px solid #2a2f3f;background:transparent;color:#94a3b8;font-size:12px;cursor:pointer;transition:.15s}
+#topbar .view-tab.active{background:#5b8af4;color:#fff;border-color:#5b8af4}
+#topbar .view-tab:hover:not(.active){border-color:#5b8af4;color:#e2e8f0}
+#main{display:flex;flex:1;overflow:hidden}
+#sidebar{width:200px;background:#181b24;border-right:1px solid #2a2f3f;padding:12px 0;flex-shrink:0;overflow-y:auto}
+#sidebar .section-head{padding:8px 16px 4px;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#64748b;font-weight:600}
+#sidebar .filter-item{padding:6px 16px;font-size:13px;color:#94a3b8;cursor:pointer;transition:.1s;border-left:2px solid transparent}
+#sidebar .filter-item:hover{color:#e2e8f0;background:#1e2230}
+#sidebar .filter-item.active{color:#5b8af4;border-left-color:#5b8af4;background:#1e2230}
+#content{flex:1;overflow:hidden;position:relative}
+.view-pane{display:none;height:100%;overflow:auto;padding:20px}
+.view-pane.active{display:block}
+/* Stats strip */
+#stats-strip{display:flex;gap:24px;padding:12px 0 20px;border-bottom:1px solid #2a2f3f;margin-bottom:20px;flex-wrap:wrap}
+.stat-item{display:flex;flex-direction:column;align-items:center}
+.stat-item .stat-val{font-size:22px;font-weight:700;color:#f1f5f9}
+.stat-item .stat-label{font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.05em}
+/* Flow cards */
+#flow-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.flow-card{background:#181b24;border:1px solid #2a2f3f;border-radius:10px;padding:14px;cursor:pointer;transition:.15s}
+.flow-card:hover{border-color:#5b8af4;transform:translateY(-1px);box-shadow:0 4px 20px rgba(0,0,0,.3)}
+.flow-card .card-header{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.flow-card .card-icon{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.flow-card .card-name{font-weight:600;font-size:14px;color:#f1f5f9}
+.flow-card .card-route{font-size:11px;color:#5b8af4;font-family:monospace;margin-bottom:4px}
+.flow-card .card-summary{font-size:12px;color:#94a3b8;line-height:1.4;margin-bottom:8px}
+.flow-card .card-tags{display:flex;gap:4px;flex-wrap:wrap}
+.tag{display:inline-block;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:500}
+.tag.blue{background:rgba(91,138,244,.2);color:#5b8af4}
+.tag.green{background:rgba(52,211,153,.2);color:#34d399}
+.tag.yellow{background:rgba(251,191,36,.2);color:#fbbf24}
+.tag.red{background:rgba(248,113,113,.2);color:#f87171}
+.tag.purple{background:rgba(167,139,250,.2);color:#a78bfa}
+.tag.cyan{background:rgba(34,211,238,.2);color:#22d3ee}
+.tag.orange{background:rgba(251,146,60,.2);color:#fb923c}
+.tag.gray{background:rgba(100,116,139,.2);color:#94a3b8}
+/* Modal */
+#modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);backdrop-filter:blur(4px);z-index:1000;align-items:center;justify-content:center}
+#modal-overlay.show{display:flex}
+#modal{background:#181b24;border:1px solid #2a2f3f;border-radius:14px;max-width:680px;width:90vw;max-height:85vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.6);padding:28px;position:relative}
+#modal .close-btn{position:absolute;top:14px;right:16px;background:none;border:none;color:#64748b;font-size:20px;cursor:pointer;line-height:1}
+#modal .close-btn:hover{color:#e2e8f0}
+#modal .modal-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;margin-bottom:12px}
+#modal .modal-title{font-size:20px;font-weight:700;color:#f1f5f9;margin-bottom:4px}
+#modal .modal-route{font-family:monospace;font-size:12px;color:#5b8af4;margin-bottom:12px}
+#modal .modal-section{margin-bottom:16px}
+#modal .modal-section .ms-head{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#64748b;font-weight:600;margin-bottom:6px}
+#modal .modal-section p,#modal .modal-section li{font-size:13px;color:#cbd5e1;line-height:1.5}
+#modal .modal-section ol{padding-left:18px}
+#modal .modal-section ol li{margin-bottom:4px}
+#modal .modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+#modal .modal-grid .mg-item{background:#1e2230;border-radius:8px;padding:10px}
+#modal .modal-grid .mg-label{font-size:10px;text-transform:uppercase;color:#64748b;margin-bottom:2px}
+#modal .modal-grid .mg-value{font-size:13px;color:#e2e8f0;font-family:monospace}
+/* Highlight search */
+mark{background:rgba(91,138,244,.35);color:#e2e8f0;border-radius:2px;padding:0 2px}
+/* Diagram view */
+#diagram-wrap{position:relative;overflow:auto;height:100%}
+#diagram-canvas{position:relative;min-height:600px;background-image:linear-gradient(rgba(42,47,63,.3) 1px,transparent 1px),linear-gradient(90deg,rgba(42,47,63,.3) 1px,transparent 1px);background-size:24px 24px;padding-bottom:40px}
+.diagram-lanes{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;padding:0 12px;position:relative}
+.diagram-lane{border-right:1px solid #2a2f3f;min-height:400px;padding:0 8px 16px}
+.diagram-lane:last-child{border-right:none}
+.lane-header{text-align:center;padding:8px 4px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;position:sticky;top:0;background:#0f1117;z-index:10;border-bottom:1px solid #2a2f3f;margin:0 -8px 12px}
+.lane-header .lane-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle}
+.lane-color-0{background:rgba(52,211,153,.3)}.lane-color-1{background:rgba(91,138,244,.3)}.lane-color-2{background:rgba(167,139,250,.3)}.lane-color-3{background:rgba(251,191,36,.3)}.lane-color-4{background:rgba(34,211,238,.3)}.lane-color-5{background:rgba(100,116,139,.3)}
+.diagram-node{background:#1e2230;border:1px solid #2a2f3f;border-radius:8px;padding:8px 10px;margin-bottom:8px;cursor:pointer;transition:.15s;position:relative;z-index:2}
+.diagram-node:hover{border-color:#5b8af4;background:#222840}
+.diagram-node .node-label{font-size:12px;font-weight:500;color:#e2e8f0}
+.diagram-node .node-sub{font-size:10px;color:#64748b;font-family:monospace;margin-top:2px}
+.diagram-node.active{border-color:#5b8af4;background:#1e2a50;box-shadow:0 0 12px rgba(91,138,244,.3)}
+.diagram-node.dimmed{opacity:.25}
+/* Flow panel (right side in diagram view) */
+#diagram-layout{display:flex;height:100%}
+#diagram-main{flex:1;overflow:auto}
+#flow-panel{width:260px;background:#181b24;border-left:1px solid #2a2f3f;display:flex;flex-direction:column;flex-shrink:0}
+#flow-panel .panel-header{padding:10px 14px;font-size:12px;font-weight:600;color:#94a3b8;border-bottom:1px solid #2a2f3f;display:flex;align-items:center;gap:8px}
+#legend-strip{display:flex;flex-wrap:wrap;gap:6px;padding:8px 14px;border-bottom:1px solid #2a2f3f}
+#legend-strip .legend-item{display:flex;align-items:center;gap:4px;font-size:10px;color:#64748b}
+#legend-strip .legend-dot{width:8px;height:8px;border-radius:50%}
+#flow-list{flex:1;overflow-y:auto;padding:6px 0}
+.flow-list-item{padding:8px 14px;cursor:pointer;border-left:3px solid transparent;font-size:12px;color:#94a3b8;transition:.1s}
+.flow-list-item:hover{background:#1e2230;color:#e2e8f0}
+.flow-list-item.active{background:#1e2230;border-left-color:#5b8af4;color:#f1f5f9}
+#flow-steps-panel{border-top:1px solid #2a2f3f;padding:10px 14px;max-height:200px;overflow-y:auto}
+#flow-steps-panel .step-title{font-size:11px;font-weight:600;color:#94a3b8;margin-bottom:6px}
+#flow-steps-panel .step-item{padding:3px 0;font-size:11px;color:#cbd5e1}
+#flow-steps-panel .step-item .step-num{color:#5b8af4;margin-right:4px}
+/* SVG connection layer */
+#connections-svg{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:1}
+@keyframes dashFlow{to{stroke-dashoffset:-24}}
+.connection-path{stroke-dasharray:6 4;animation:dashFlow 1s linear infinite}
+/* Scrollbar style */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#2a2f3f;border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:#3a3f4f}
+/* Hide no-results by default */
+.no-results{display:none;text-align:center;padding:60px 20px;color:#64748b}
+.no-results.show{display:block}
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <div class="app-title">🔒 <span>LockedCode</span> — App Flows</div>
+  <div class="search-wrap">
+    <span class="search-icon">⌕</span>
+    <input id="search-input" type="text" placeholder="Search flows, routes, providers, services..." oninput="onSearch()">
+  </div>
+  <div class="view-tabs">
+    <button class="view-tab active" onclick="switchView('cards',this)">Flow Cards</button>
+    <button class="view-tab" onclick="switchView('diagram',this)">Architecture Diagram</button>
+  </div>
+</div>
+
+<div id="main">
+  <div id="sidebar">
+    <div class="section-head">Sections</div>
+    <div class="filter-item active" data-section="all" onclick="filterSection('all',this)">All Flows</div>
+    <div class="filter-item" data-section="core" onclick="filterSection('core',this)">Core</div>
+    <div class="filter-item" data-section="security" onclick="filterSection('security',this)">Security</div>
+    <div class="filter-item" data-section="quality" onclick="filterSection('quality',this)">Quality</div>
+    <div class="filter-item" data-section="advanced" onclick="filterSection('advanced',this)">Advanced</div>
+    <div class="filter-item" data-section="external" onclick="filterSection('external',this)">External</div>
+    <div class="section-head" style="margin-top:12px">Reference</div>
+    <div class="filter-item" data-section="routes" onclick="filterSection('routes',this)">Routes</div>
+    <div class="filter-item" data-section="providers" onclick="filterSection('providers',this)">Providers</div>
+    <div class="filter-item" data-section="services" onclick="filterSection('services',this)">Services</div>
+  </div>
+
+  <div id="content">
+    <!-- FLOW CARDS VIEW -->
+    <div id="cards-view" class="view-pane active">
+      <div id="stats-strip"></div>
+      <div id="flow-grid"></div>
+      <div class="no-results" id="no-results">No flows match your search.</div>
+    </div>
+
+    <!-- DIAGRAM VIEW -->
+    <div id="diagram-view" class="view-pane">
+      <div id="diagram-layout">
+        <div id="diagram-main">
+          <div id="diagram-wrap">
+            <div id="diagram-canvas">
+              <svg id="connections-svg"></svg>
+              <div class="diagram-lanes" id="diagram-lanes"></div>
+            </div>
+          </div>
+        </div>
+        <div id="flow-panel">
+          <div class="panel-header">📋 All Flows</div>
+          <div id="legend-strip"></div>
+          <div id="flow-list"></div>
+          <div id="flow-steps-panel"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div id="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div id="modal">
+    <button class="close-btn" onclick="closeModal()">&times;</button>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// APP DATA
+// ============================================================
+const APP_DATA = {
+  meta: {
+    app: "LockedCode",
+    version: "1.0.0",
+    platform: "Bun + Turborepo monorepo",
+    db: "SQLite via Drizzle ORM (bun:sqlite)",
+    state: "Effect-ts Context.Tag + Layer DI",
+    routing: "Yargs CLI commands + HTTP API (Hono)",
+    generated: new Date().toISOString().slice(0,10)
+  },
+
+  flows: [
+    // ---- CORE ----
+    {
+      id: "f1", section: "core", icon: "▶", color: "#5b8af4",
+      name: "Single Prompt Execution", route: "lockedcode run <message>",
+      entry: "CLI: src/index.ts", exit: "STDOUT: final LLM response",
+      summary: "Non-interactive run: send a prompt, get a response, exit. The primary user flow.",
+      steps: [
+        "1. Process starts — yargs parses CLI args, middleware initializes logs & runs JSON migration",
+        "2. InstanceStore.load({directory}) loads project config, plugins, initializes LSP + file watchers",
+        "3. Session.Service.create() inserts row in session table",
+        "4. sdk.event.subscribe() opens SSE stream for session events",
+        "5. sdk.session.prompt({parts:[text]}) -> HTTP request to in-process server",
+        "6. Server handler receives prompt -> SessionPrompt.Service.prompt()",
+        "7. createUserMessage() resolves agent, model, file attachments; creates message + part rows",
+        "8. Context build: loads message history, builds system prompt (agent instructions + config + tools)",
+        "9. LLM.Service.stream() -> streamText() (Vercel AI SDK) with resolved tools",
+        "10. Tool resolution: resolveTools() -> ToolRegistry.tools() -> builtin + MCP + custom filtered by permissions",
+        "11. Security interception: evaluatePolicy() -> scanContent()/scanCommand() -> audit recording",
+        "12. LLM emits tool calls -> tool.execute() via Effect (read, grep, shell, write, etc.)",
+        "13. Tool results stream back to LLM until final text response",
+        "14. Events published on Bus -> SSE -> CLI subscriber renders output",
+        "15. Session idle -> session.status event -> CLI exits"
+      ],
+      providers: ["Session.Service", "SessionPrompt.Service", "LLM.Service", "ToolRegistry.Service", "Config.Service", "Security.Service", "Bus.Service", "Permission.Service"],
+      services: ["SessionService", "SessionPromptService", "LLMService", "ToolRegistry", "ConfigService", "SecurityService", "BusService", "PermissionService"],
+      db_tables: ["session", "message", "part", "project", "permission", "security_event", "model_registry"],
+      nodes: {
+        user: ["cli", "stdin_stdout"],
+        screens: ["src/index.ts", "cmd/run.ts", "session/prompt.ts", "session/llm.ts", "tool/registry.ts"],
+        providers: ["Session.Service", "SessionPrompt.Service", "LLM.Service", "ToolRegistry.Service", "Config.Service", "Security.Service", "Bus.Service", "Permission.Service"],
+        services: ["InstanceStore", "SessionService", "SessionPrompt", "LLM", "ToolRegistry", "Security", "Bus", "Permission"],
+        db: ["session", "message", "part", "project", "permission", "security_event"],
+        external: ["LLM Provider API", "tree-sitter WASM"]
+      },
+      tags: [["cli","blue"],["core","green"],["execution","cyan"]]
+    },
+    {
+      id: "f2", section: "core", icon: "💬", color: "#34d399",
+      name: "Interactive Mode", route: "lockedcode run --interactive",
+      entry: "CLI: cmd/run/runtime.ts", exit: "Ctrl+C or session idle",
+      summary: "Full TUI session: user types prompts in a split-footer UI, sees streaming responses inline.",
+      steps: [
+        "1. Same init as single prompt through session creation",
+        "2. Boots in-process HTTP server",
+        "3. Launches SolidJS split-footer TUI (cmd/run/runtime.ts + footer.tsx)",
+        "4. User types in footer prompt, submits -> SDK prompt() call path",
+        "5. Scrollback buffer renders messages; tool calls displayed inline in TUI",
+        "6. Permission prompts shown in footer; user approves/denies via keyboard",
+        "7. Session status events update TUI footer (spinner, token count, timer)",
+        "8. Exit on Ctrl+C or after session idle timeout"
+      ],
+      providers: ["Session.Service", "SessionPrompt.Service", "LLM.Service", "ToolRegistry.Service", "Runtime.Service"],
+      services: ["SessionService", "SessionPrompt", "LLM", "ToolRegistry", "InstanceStore", "RuntimeBoot"],
+      db_tables: ["session", "message", "part"],
+      nodes: {
+        user: ["developer_tui"],
+        screens: ["cmd/run/runtime.ts", "cmd/run/footer.tsx", "cmd/run/scrollback.ts", "cmd/run/permission.shared.ts", "cmd/run/question.shared.ts"],
+        providers: ["Session.Service", "SessionPrompt.Service", "Runtime.Service", "ToolRegistry.Service"],
+        services: ["RuntimeBoot", "RuntimeLifecycle", "Scrollback", "PermissionPrompt", "QuestionHandler"],
+        db: ["session", "message", "part"],
+        external: ["STDIN", "STDOUT (ANSI/TUI)"]
+      },
+      tags: [["tui","green"],["interactive","cyan"],["core","blue"]]
+    },
+    {
+      id: "f3", section: "core", icon: "🔗", color: "#a78bfa",
+      name: "Remote Attach Session", route: "lockedcode run --interactive --attach <url>",
+      entry: "CLI: cmd/run.ts + HTTP SDK", exit: "Ctrl+C or disconnect",
+      summary: "Connect TUI to a remote LockedCode server instance.",
+      steps: [
+        "1. Connect to remote server via HTTP SDK (configured by --attach flag)",
+        "2. Auth headers sent with each request (API key or OAuth)",
+        "3. All session management happens server-side",
+        "4. Local TUI renders same as interactive mode",
+        "5. SSE stream from server drives real-time scrollback updates",
+        "6. Input handled locally, sent as HTTP requests to remote server"
+      ],
+      providers: ["Session.Service", "SDK/Client", "Runtime.Service"],
+      services: ["HttpClient", "SSEStream", "Runtime", "AuthClient"],
+      db_tables: ["session", "message", "part"],
+      nodes: {
+        user: ["developer_tui"],
+        screens: ["cmd/run/runtime.ts", "cmd/run/footer.tsx", "http-client.ts"],
+        providers: ["SDK.Client", "Runtime.Service"],
+        services: ["HttpClient", "SSEStream", "AuthClient"],
+        db: [],
+        external: ["Remote LockedCode Server (HTTP)", "mDNS discovery (bonjour-service)"]
+      },
+      tags: [["remote","purple"],["tui","green"],["core","blue"]]
+    },
+
+    // ---- SECURITY ----
+    {
+      id: "f4", section: "security", icon: "🛡", color: "#f87171",
+      name: "Policy Evaluation (Chokepoint 1)", route: "on tool.execute()",
+      entry: "tool/registry.ts: tools() method", exit: "allow/deny decision returned to tool executor",
+      summary: "Every tool call passes through SecurityService.evaluatePolicy() before execution.",
+      steps: [
+        "1. Tool.execute() is called by LLM processor",
+        "2. Security-evaluated wrapper in registry.ts intercepts",
+        "3. SecurityService.evaluatePolicy({action: tool.id, params, model}) called",
+        "4. PolicyEngine loads merged policy (builtin -> XDG -> lockedcode.yaml -> session)",
+        "5. evaluate() iterates rules in reverse; last match wins",
+        "6. If deny -> AuditService.record(ActionBlocked) + return blocked response to LLM",
+        "7. If allow -> proceed to trust scoring",
+        "8. SecurityService.scoreTrust({action, params, policyResult}) returns 0-100 score",
+        "9. If score > promptThreshold -> ctx.ask() requires user approval",
+        "10. If score > blockThreshold -> hard block, no override",
+        "11. On pass -> call confine() for filesystem-touching tools",
+        "12. Call scan() for write/edit/patch tools",
+        "13. Proceed to original tool execute",
+        "14. After execute -> AuditService.record() with full result"
+      ],
+      providers: ["Security.Service", "PolicyEngine.Service", "AuditService.Service", "TrustService.Service", "Permission.Service", "Bus.Service"],
+      services: ["SecurityService", "PolicyEngine", "AuditService", "TrustService", "PermissionService", "ConfinementService", "ScanningService"],
+      db_tables: ["security_event", "policy_document", "model_registry", "model_trust"],
+      nodes: {
+        user: ["administrator"],
+        screens: ["tool/registry.ts", "security/index.ts", "policy/index.ts", "audit/index.ts", "trust/index.ts"],
+        providers: ["Security.Service", "PolicyEngine.Service", "AuditService.Service", "TrustService.Service", "Permission.Service", "Bus.Service"],
+        services: ["SecurityService", "PolicyEngine", "AuditService", "TrustService", "PermissionService", "ConfinementService", "ScanningService"],
+        db: ["security_event", "policy_document", "model_registry", "model_trust"],
+        external: ["lockedcode.yaml config file"]
+      },
+      tags: [["security","red"],["policy","orange"],["core","blue"]]
+    },
+    {
+      id: "f5", section: "security", icon: "🔒", color: "#fb923c",
+      name: "Shell Command Scan (Chokepoint 2)", route: "shell.ts execute()",
+      entry: "tool/shell.ts: execute() between parse and spawn", exit: "command allowed/blocked",
+      summary: "All shell commands are parsed via tree-sitter, paths extracted, and validated against policy & confinement.",
+      steps: [
+        "1. LLM emits shell tool call",
+        "2. ShellTool.execute() called",
+        "3. Command string parsed via tree-sitter WASM (bash or PowerShell)",
+        "4. Extracted file paths from command (redirects, args, subshells)",
+        "5. SecurityService.evaluatePolicy({action: 'shell', command, extractedPaths})",
+        "6. SecurityService.confine({paths: extractedPaths}) -> validate all paths against project root",
+        "7. Check hard-blocked command patterns (rm -rf /, curl | bash, etc.)",
+        "8. SecurityService.scoreTrust({action: 'shell', command})",
+        "9. If any check denies -> AuditService.record + return blocked",
+        "10. If pass -> ctx.ask('bash', patterns) for permission ruleset",
+        "11. Fork shell process via PTY layer (Bun/Node adapter)",
+        "12. Stream output back through session processor",
+        "13. AuditService.record(completed) with command, duration, exit code"
+      ],
+      providers: ["Security.Service", "PolicyEngine.Service", "AuditService.Service", "Permission.Service", "ConfinementService.Service"],
+      services: ["SecurityService", "PolicyEngine", "AuditService", "PermissionService", "ConfinementService", "ShellPTY"],
+      db_tables: ["security_event", "policy_document"],
+      nodes: {
+        user: ["developer"],
+        screens: ["tool/shell.ts", "shell/shell.ts", "security/index.ts", "confinement/index.ts"],
+        providers: ["Security.Service", "PolicyEngine.Service", "Permission.Service", "ConfinementService.Service"],
+        services: ["SecurityService", "PolicyEngine", "ConfinementService", "ShellPTY", "PathCanonicalizer"],
+        db: ["security_event"],
+        external: ["tree-sitter WASM", "OS Shell (bash/zsh/pwsh)", "PTY Layer"]
+      },
+      tags: [["security","red"],["shell","orange"],["chokepoint","yellow"]]
+    },
+    {
+      id: "f6", section: "security", icon: "🔍", color: "#22d3ee",
+      name: "Content Scanning Pipeline", route: "on write/edit/patch tool execute",
+      entry: "tool.registry.ts: scanContent() call", exit: "allow/warn/block decision",
+      summary: "All file writes are scanned by Semgrep, YARA, entropy analysis, and secret detection.",
+      steps: [
+        "1. WriteTool/EditTool/ApplyPatchTool.execute() called",
+        "2. Security intercept in registry.ts invokes SecurityService.scan()",
+        "3. ScanningService runs all registered scanners in parallel via Effect.all()",
+        "4. Semgrep scanner: invokes semgrep CLI with bundled rules (YAML)",
+        "5. YARA scanner: invokes yara CLI with malware signatures",
+        "6. Entropy scanner: detects high-entropy strings in file content",
+        "7. Secret scanner: checks 50+ credential patterns (AWS, GitHub, SSH keys, JWTs, DB URIs)",
+        "8. Injection scanner: checks prompt injection patterns (role override, system markers, unicode)",
+        "9. Scanners unavailable (binary not on PATH) -> gracefully skipped with warning",
+        "10. Results aggregated; highest severity finding determines overall result",
+        "11. If critical -> block file write, audit record, return explanation to LLM",
+        "12. If warning -> allow with audit record; trust score adjusted upward",
+        "13. On allow -> file written to disk",
+        "14. AuditService.record(completed) with scan findings"
+      ],
+      providers: ["Security.Service", "ScanningService.Service", "AuditService.Service", "SecretScanner.Service", "InjectionScanner.Service"],
+      services: ["SecurityService", "ScanningService", "SemgrepScanner", "YaraScanner", "EntropyScanner", "SecretScanner", "InjectionScanner", "AuditService"],
+      db_tables: ["security_event", "scan_result"],
+      nodes: {
+        user: ["security_team"],
+        screens: ["security/scanning/index.ts", "security/semgrep.ts", "security/yara.ts", "security/entropy.ts", "security/secrets/index.ts", "security/injection/index.ts"],
+        providers: ["ScanningService.Service", "SecretScanner.Service", "InjectionScanner.Service", "AuditService.Service"],
+        services: ["ScanningService", "SemgrepScanner", "YaraScanner", "EntropyScanner", "SecretScanner", "InjectionScanner"],
+        db: ["security_event", "scan_result"],
+        external: ["semgrep (Go/Python binary)", "yara (binary)", "rules/ directory (YAML, JSON rules)"]
+      },
+      tags: [["security","red"],["scanning","cyan"],["dlp","purple"]]
+    },
+    {
+      id: "f7", section: "security", icon: "👁", color: "#fbbf24",
+      name: "DLP Outbound Scanning (Chokepoint 3)", route: "session/prompt.ts context building",
+      entry: "session/prompt.ts: file content -> LLM context", exit: "block/redact/allow",
+      summary: "File contents are scanned for secrets & PII before entering the LLM context window.",
+      steps: [
+        "1. User requests file content via prompt attachment or read tool",
+        "2. File contents read from disk",
+        "3. Before adding to prompt context, SecurityService.scan({content, action:'dlp', metadata})",
+        "4. DLP scanner checks for: API keys, tokens, passwords, PII (SSN, email, phone, credit cards)",
+        "5. File-level sensitivity policy matched (public/internal/confidential/restricted)",
+        "6. If sensitive content detected:",
+        "   - block mode: file excluded from context, audit recorded",
+        "   - warn mode: file included but warning logged and TUI notified",
+        "   - redact mode: sensitive values replaced with typed placeholders",
+        "7. Injection scanner checks content for prompt injection patterns",
+        "8. Clean content added to LLM message context array",
+        "9. LLM call proceeds with filtered context"
+      ],
+      providers: ["Security.Service", "DLPService.Service", "AuditService.Service", "InjectionScanner.Service"],
+      services: ["SecurityService", "DLPService", "SecretScanner", "PIIScanner", "RedactionEngine", "FileClassifier", "AuditService"],
+      db_tables: ["security_event", "scan_result", "policy_document"],
+      nodes: {
+        user: ["developer"],
+        screens: ["session/prompt.ts", "security/dlp/index.ts", "security/dlp/scanner.ts", "security/dlp/redact.ts", "security/dlp/policy.ts"],
+        providers: ["DLPService.Service", "InjectionScanner.Service", "AuditService.Service"],
+        services: ["DLPService", "SecretScanner", "PIIScanner", "RedactionEngine", "FileClassifier", "AuditService"],
+        db: ["security_event"],
+        external: ["N/A (all local scanning)"]
+      },
+      tags: [["security","red"],["dlp","purple"],["chokepoint","yellow"]]
+    },
+    {
+      id: "f8", section: "security", icon: "🧱", color: "#64748b",
+      name: "Confinement (OS-Level Jail)", route: "on startup + every path touch",
+      entry: "security/confinement/index.ts", exit: "confined process or escape hatch",
+      summary: "OS-level filesystem jail: agent processes confined to the project directory.",
+      steps: [
+        "1. On startup, ConfinementService.detectBackend() checks platform capabilities",
+        "2. Linux: checks Landlock support via /proc, falls back to Bubblewrap",
+        "3. macOS: generates Seatbelt sandbox-exec profile",
+        "4. Windows: sets up restricted token + NTFS ACLs + job object",
+        "5. Project root detected: nearest .git, lockedcode.yaml, or cwd fallback",
+        "6. All paths canonicalized: symlinks resolved, ~ expanded, ../ resolved",
+        "7. Pre-approved paths set: /tmp, ~/.cache, ~/.npm, ~/.bun, etc.",
+        "8. On every file operation, checkPath() validates target is inside boundary",
+        "9. If outside boundary -> escape hatch flow:",
+        "   a. SecurityEvent.escape_requested published to Bus",
+        "   b. TUI shows approval prompt to user",
+        "   c. On approve: execute + log SecurityEvent.escape_approved",
+        "   d. On deny: block + log SecurityEvent.escape_denied",
+        "10. Sub-agent processes inherit confinement context"
+      ],
+      providers: ["Security.Service", "ConfinementService.Service", "AuditService.Service", "Bus.Service"],
+      services: ["SecurityService", "ConfinementService", "PathCanonicalizer", "ProcessTreeModel", "EscapeHatchHandler"],
+      db_tables: ["security_event"],
+      nodes: {
+        user: ["administrator"],
+        screens: ["security/confinement/index.ts", "security/confinement/linux.ts", "security/confinement/macos.ts", "security/confinement/windows.ts", "security/confinement/common.ts"],
+        providers: ["ConfinementService.Service", "AuditService.Service", "Bus.Service"],
+        services: ["ConfinementService", "LinuxLandlock", "MacOSSandbox", "WindowsRestrictedToken", "PathCanonicalizer", "EscapeHatchHandler"],
+        db: ["security_event"],
+        external: ["Landlock LSM (Linux)", "sandbox-exec (macOS)", "NTFS ACLs + Job Objects (Windows)", "Bubblewrap (Linux fallback)"]
+      },
+      tags: [["security","red"],["confinement","gray"],["os","muted"]]
+    },
+
+    // ---- QUALITY ----
+    {
+      id: "f9", section: "quality", icon: "✓", color: "#34d399",
+      name: "LSP Integration", route: "on file open/edit + agent uses lsp tool",
+      entry: "LSP.Service via lsp tool", exit: "diagnostics returned to LLM",
+      summary: "Language Server Protocol provides real-time diagnostics, symbols, and completions.",
+      steps: [
+        "1. LSP.Service initialized on instance boot (language detection per file)",
+        "2. LSP client connects to language server for detected languages",
+        "3. documentSymbols() returns symbols for active file",
+        "4. documentDiagnostics() returns errors/warnings for active file",
+        "5. lsp.lsp.updated events fire on diagnostic changes",
+        "6. Agent calls lsp tool -> gets current diagnostics/symbols",
+        "7. Diagnostics context fed into LLM for higher quality code generation"
+      ],
+      providers: ["LSP.Service", "Config.Service(partial:lsp)"],
+      services: ["LSPService", "LSPClient", "LSPServerManager", "LanguageDetector", "DiagnosticHandler"],
+      db_tables: [],
+      nodes: {
+        user: ["developer"],
+        screens: ["lsp/lsp.ts", "lsp/client.ts", "lsp/server.ts", "lsp/language.ts", "lsp/diagnostic.ts"],
+        providers: ["LSP.Service"],
+        services: ["LSPService", "LSPClient", "LanguageDetector", "DiagnosticHandler"],
+        db: [],
+        external: ["Language Servers (typescript-language-server, pyright, etc.)", "vscode-jsonrpc", "vscode-languageserver-types"]
+      },
+      tags: [["quality","green"],["lsp","cyan"],["dx","blue"]]
+    },
+    {
+      id: "f10", section: "quality", icon: "📋", color: "#22d3ee",
+      name: "Session & Context Management", route: "throughout session lifecycle",
+      entry: "Session.Service.create()", exit: "Session archival/deletion",
+      summary: "Full session lifecycle: creation, message storage, compaction, summarization, forking.",
+      steps: [
+        "1. Session.Service.create() -> insert row in session table (id, slug, project, agent, model)",
+        "2. On each prompt: createUserMessage() stores text + parts in message/part tables",
+        "3. MessageV2 provides versioned message types: text, file, subtask, tool, patch, snapshot",
+        "4. Context overflow handling: compaction.ts truncates oldest messages",
+        "5. Summary generation: summary agent generates session summaries",
+        "6. Session forking: fork() copies messages with new IDs (for experiment branches)",
+        "7. Session revert: revert() restores to previous state",
+        "8. Session export/import: export as JSON, import from file/URL",
+        "9. Session service provides list(), get(), messages(), setTitle(), remove()"
+      ],
+      providers: ["Session.Service", "Bus.Service"],
+      services: ["SessionService", "MessageService", "CompactionService", "SummaryService", "ExportService", "ImportService"],
+      db_tables: ["session", "message", "part", "session_message", "todo"],
+      nodes: {
+        user: ["developer"],
+        screens: ["session/session.ts", "session/prompt.ts", "session/compaction.ts", "session/summary.ts", "session/message-v2.ts", "session/overflow.ts", "session/revert.ts"],
+        providers: ["Session.Service", "Bus.Service"],
+        services: ["SessionService", "MessageService", "CompactionService", "SummaryService"],
+        db: ["session", "message", "part", "session_message", "todo"],
+        external: ["N/A"]
+      },
+      tags: [["session","cyan"],["context","blue"],["quality","green"]]
+    },
+
+    // ---- ADVANCED ----
+    {
+      id: "f11", section: "advanced", icon: "🤖", color: "#a78bfa",
+      name: "GitHub Agent (CI/CD)", route: "lockedcode github run",
+      entry: "GitHub Actions workflow dispatch", exit: "PR comment or commit push",
+      summary: "Runs LockedCode as a GitHub Actions agent: responds to issues, PRs, and scheduled tasks.",
+      steps: [
+        "1. Triggered by GitHub Actions workflow on issue_comment, pull_request, schedule, or workflow_dispatch",
+        "2. Gets OIDC token from GitHub, exchanges for installation access token",
+        "3. Parses event context: issue comment, PR review, schedule event",
+        "4. For repo-scoped events: checks out target branch, runs agent, creates PR",
+        "5. For issue comments: extracts prompt from comment, creates branch, runs agent, pushes changes",
+        "6. Handles fork PRs with cross-repo checkout",
+        "7. Posts comment back on issue/PR with agent response",
+        "8. Supports images in comments (base64 decode, store, reference)",
+        "9. Manages concurrent runs via git lock files"
+      ],
+      providers: ["GitHub.Service", "Session.Service", "Security.Service"],
+      services: ["GitHubService", "GitHubAuth", "GitHubPR", "GitHubComment", "LockManager"],
+      db_tables: ["session", "project"],
+      nodes: {
+        user: ["github_user"],
+        screens: ["cmd/github.ts", "provider/auth.ts"],
+        providers: ["GitHub.Service", "Session.Service"],
+        services: ["GitHubService", "GitHubAuth", "GitHubPR", "GitHubComment"],
+        db: ["session", "project"],
+        external: ["GitHub API (@octokit/rest)", "GitHub OIDC", "Git (VCS)", "Actions workflow YAML"]
+      },
+      tags: [["github","purple"],["ci/cd","orange"],["advanced","blue"]]
+    },
+    {
+      id: "f12", section: "advanced", icon: "🔌", color: "#fb923c",
+      name: "MCP Integration", route: "lockedcode mcp add/list/auth/debug",
+      entry: "mcp/index.ts Service", exit: "MCP tools available in agent toolset",
+      summary: "Model Context Protocol: connect local or remote MCP servers for additional tools & resources.",
+      steps: [
+        "1. MCP.Service manages connections to MCP servers (stdio, SSE, Streamable HTTP)",
+        "2. Local MCP: spawns child process with stdio transport",
+        "3. Remote MCP: HTTP/S with optional OAuth 2.0 (dynamic client registration)",
+        "4. Server capabilities discovered on connect: tools, resources, prompts",
+        "5. Tools auto-registered in ToolRegistry via ToolsChanged event",
+        "6. Resources accessible via readResource()",
+        "7. OAuth tokens stored securely, refreshed automatically",
+        "8. MCP tools appear alongside built-in tools in agent context"
+      ],
+      providers: ["MCP.Service", "ToolRegistry.Service", "Bus.Service"],
+      services: ["MCPService", "MCPAuth", "MCPOAuthCallback", "MCPOAuthProvider", "MCPClient"],
+      db_tables: [],
+      nodes: {
+        user: ["developer"],
+        screens: ["mcp/index.ts", "mcp/auth.ts", "mcp/oauth-callback.ts", "mcp/oauth-provider.ts"],
+        providers: ["MCP.Service", "ToolRegistry.Service", "Bus.Service"],
+        services: ["MCPService", "MCPAuth", "MCPClient"],
+        db: [],
+        external: ["MCP Servers (stdio/SSE/HTTP)", "OAuth 2.0 Providers"]
+      },
+      tags: [["mcp","orange"],["integration","purple"],["advanced","blue"]]
+    },
+    {
+      id: "f13", section: "advanced", icon: "🗄", color: "#64748b",
+      name: "HTTP API Server", route: "lockedcode serve or lockedcode web",
+      entry: "server/index.ts", exit: "Server shutdown",
+      summary: "Headless HTTP server with REST API + SSE for remote session management.",
+      steps: [
+        "1. Server.listen() starts Hono-based HTTP server on port (default: 4096)",
+        "2. Auth middleware validates requests (basic auth, token auth)",
+        "3. Public API endpoints: session CRUD, prompt execution, event streaming",
+        "4. SSE endpoint for real-time session events (message updates, tool calls)",
+        "5. CORS configured for cross-origin clients",
+        "6. OpenAPI spec auto-generated from PublicApi definition",
+        "7. mDNS advertises server on local network (bonjour-service)",
+        "8. Client SDK connects via HTTP SDK with SSE subscription"
+      ],
+      providers: ["Server.Service", "Session.Service", "Bus.Service"],
+      services: ["ServerService", "AuthMiddleware", "CorsHandler", "SSEManager", "OpenAPIGenerator", "MDNSDiscovery"],
+      db_tables: ["session", "project"],
+      nodes: {
+        user: ["api_client", "remote_client"],
+        screens: ["server/index.ts", "server/auth.ts", "server/cors.ts", "routes/instance/httpapi/public.ts", "routes/instance/httpapi/api.ts"],
+        providers: ["Server.Service", "Session.Service", "Bus.Service"],
+        services: ["ServerService", "AuthMiddleware", "SSEManager", "OpenAPIGenerator", "MDNSDiscovery"],
+        db: ["session", "project"],
+        external: ["HTTP Clients (curl, SDK, TUI)", "mDNS (bonjour-service)"]
+      },
+      tags: [["api","gray"],["server","blue"],["advanced","blue"]]
+    },
+    {
+      id: "f14", section: "advanced", icon: "🧩", color: "#22d3ee",
+      name: "Plugin System", route: "lockedcode plugin <module> or config directories",
+      entry: "plugin/index.ts", exit: "Custom tools available in agent",
+      summary: "NPM-based plugin system allows custom tools and agents from third-party packages.",
+      steps: [
+        "1. Plugin scanned from config directories ({tool,tools}/*.{js,ts})",
+        "2. Plugin.Service.load() installs npm plugin packages",
+        "3. Plugin lifecycle hooks: onLoad, onUnload, onConfig",
+        "4. Plugin-provided tools registered in ToolRegistry",
+        "5. Plugin-provided agents registered in Agent.Service",
+        "6. Built-in plugin support: GitHub Copilot, Azure, Cloudflare"
+      ],
+      providers: ["Plugin.Service", "ToolRegistry.Service", "Agent.Service", "Config.Service"],
+      services: ["PluginService", "PluginScanner", "PluginLoader", "PluginLifecycle"],
+      db_tables: [],
+      nodes: {
+        user: ["developer"],
+        screens: ["plugin/index.ts", "config/config.ts"],
+        providers: ["Plugin.Service", "ToolRegistry.Service", "Agent.Service"],
+        services: ["PluginService", "PluginScanner", "PluginLoader"],
+        db: [],
+        external: ["npm registry", "Third-party packages"]
+      },
+      tags: [["plugin","cyan"],["extensibility","blue"],["advanced","blue"]]
+    },
+
+    // ---- EXTERNAL ----
+    {
+      id: "f15", section: "external", icon: "☁", color: "#94a3b8",
+      name: "LLM Provider Resolution", route: "provider/provider.ts on every LLM call",
+      entry: "LLM.Service.stream() -> provider resolution", exit: "Provider SDK initialized",
+      summary: "22+ LLM providers supported: OpenAI, Anthropic, Google, AWS Bedrock, Azure, Mistral, etc.",
+      steps: [
+        "1. ModelID and ProviderID resolved from config or agent definition",
+        "2. Provider resolution: provider.ts checks credential stores",
+        "3. Auth credentials retrieved: API key (env/file), OAuth (OIDC), or well-known config",
+        "4. Provider SDK initialized: @ai-sdk/openai, @ai-sdk/anthropic, etc.",
+        "5. modelId matched against Model Registry (approved/blocked list)",
+        "6. Provider-specific parameter transforms applied (temperature, topP, etc.)",
+        "7. streamText() from Vercel AI SDK sends the actual API call",
+        "8. Token counting and cost tracking via stats service",
+        "9. Response streamed back through LLM.Service"
+      ],
+      providers: ["LLM.Service", "Config.Service(partial:provider)", "Auth.Service"],
+      services: ["ProviderService", "AuthService", "ModelRegistry", "TokenCounter", "StatsService"],
+      db_tables: ["model_registry", "model_trust", "account", "account_state"],
+      nodes: {
+        user: ["developer"],
+        screens: ["provider/provider.ts", "provider/auth.ts", "provider/models.ts", "provider/transform.ts", "provider/schema.ts"],
+        providers: ["LLM.Service", "Auth.Service", "ModelRegistry.Service"],
+        services: ["ProviderService", "AuthService", "ModelRegistry", "TokenCounter"],
+        db: ["model_registry", "model_trust", "account", "account_state"],
+        external: ["22+ LLM Provider APIs", "OAuth/OIDC Providers", "LiteLLM Proxy"]
+      },
+      tags: [["llm","gray"],["provider","muted"],["external","muted"]]
+    },
+    {
+      id: "f16", section: "external", icon: "🧪", color: "#64748b",
+      name: "External Scanning Tools", route: "on file write / content scan",
+      entry: "ScanningService -> Semgrep/YARA CLI invocation", exit: "scan result returned",
+      summary: "Semgrep and YARA invoked as child processes for static analysis and malware detection.",
+      steps: [
+        "1. ScanningService receives scan request",
+        "2. SemgrepScanner.available() checks if semgrep is on PATH",
+        "3. If available: spawn `semgrep --config <rules> <file>` child process",
+        "4. Semgrep parses output JSON for findings",
+        "5. YaraScanner.available() checks if yara is on PATH",
+        "6. If available: spawn `yara <signatures> <file>` child process",
+        "7. YARA parses output for matched rules",
+        "8. Both results aggregated with entropy and secrets findings",
+        "9. If binary unavailable: gracefully skipped with warning log",
+        "10. Full scan never blocks pipeline; unavailable scanners are pass-through"
+      ],
+      providers: ["ScanningService.Service"],
+      services: ["ScanningService", "SemgrepScanner", "YaraScanner"],
+      db_tables: ["scan_result"],
+      nodes: {
+        user: ["security_team"],
+        screens: ["security/scanning/index.ts", "security/semgrep.ts", "security/yara.ts"],
+        providers: ["ScanningService.Service"],
+        services: ["ScanningService", "SemgrepScanner", "YaraScanner"],
+        db: ["scan_result"],
+        external: ["semgrep (Go/Python binary)", "yara (binary)", "rules/ directory"]
+      },
+      tags: [["scanning","gray"],["external","muted"],["security","red"]]
+    }
+  ],
+
+  routes: [
+    {path: "lockedcode run <message>", screen: "cmd/run.ts", notes: "Single prompt execution"},
+    {path: "lockedcode run --interactive", screen: "cmd/run/runtime.ts", notes: "Interactive TUI session"},
+    {path: "lockedcode run --interactive --attach <url>", screen: "cmd/run/runtime.ts", notes: "Remote attach"},
+    {path: "lockedcode serve", screen: "cmd/serve.ts", notes: "Headless HTTP server"},
+    {path: "lockedcode web", screen: "cmd/web.ts", notes: "HTTP + open browser"},
+    {path: "lockedcode generate", screen: "cmd/generate.ts", notes: "OpenAPI spec generation"},
+    {path: "lockedcode console login/logout/switch/orgs/open", screen: "cmd/account.ts", notes: "Console account mgmt"},
+    {path: "lockedcode agent create/list", screen: "cmd/agent.ts", notes: "Agent management"},
+    {path: "lockedcode providers list/login/logout", screen: "cmd/providers.ts", notes: "Provider credential mgmt"},
+    {path: "lockedcode mcp add/list/auth/logout/debug", screen: "cmd/mcp.ts", notes: "MCP server management"},
+    {path: "lockedcode github install/run", screen: "cmd/github.ts", notes: "GitHub Actions integration"},
+    {path: "lockedcode pr <number>", screen: "cmd/pr.ts", notes: "PR checkout and run"},
+    {path: "lockedcode plugin <module>", screen: "cmd/plug.ts", notes: "Plugin installation"},
+    {path: "lockedcode export/import <file>", screen: "cmd/export.ts / cmd/import.ts", notes: "Session export/import"},
+    {path: "lockedcode stats", screen: "cmd/stats.ts", notes: "Token/cost statistics"},
+    {path: "lockedcode acp", screen: "cmd/acp.ts", notes: "Agent Client Protocol server"},
+    {path: "lockedcode upgrade/uninstall", screen: "cmd/upgrade.ts / cmd/uninstall.ts", notes: "Self-management"},
+    {path: "lockedcode db [query|path|migrate]", screen: "cmd/db.ts", notes: "Database shell/query"},
+    {path: "lockedcode session list/replay/export", screen: "cmd/session.ts", notes: "Session history"},
+    {path: "lockedcode models list/approve/block/report", screen: "cmd/models.ts", notes: "Model registry"},
+    {path: "lockedcode compliance report", screen: "cmd/compliance.ts", notes: "Compliance reports"},
+    {path: "lockedcode license scan/report", screen: "cmd/license.ts", notes: "License management"},
+    {path: "lockedcode quarantine list/show/restore/discard", screen: "cmd/quarantine.ts", notes: "Quarantine management"},
+    {path: "lockedcode siem export/stream", screen: "cmd/siem.ts", notes: "SIEM integration"},
+    {path: "lockedcode monitor status", screen: "cmd/monitor.ts", notes: "Runtime monitoring"},
+    {path: "lockedcode security-check", screen: "cmd/security-check.ts", notes: "Security capability check"},
+    {path: "lockedcode provenance [file]", screen: "cmd/provenance.ts", notes: "Model provenance"},
+    {path: "lockedcode rules list/test [path]", screen: "cmd/rules.ts", notes: "Scanning rules management"},
+    {path: "lockedcode debug agent|config|file|lsp|ripgrep|skill|snapshot|startup", screen: "cmd/debug/", notes: "Debug utilities"}
+  ],
+
+  providers: [
+    {name: "Security.Service", type: "Effect Service", purpose: "Root security interceptor — evaluatePolicy, scan, confine, audit, scoreTrust"},
+    {name: "PolicyEngine.Service", type: "Effect Service", purpose: "Policy evaluation — hierarchy merging, allow/deny/ask decisions"},
+    {name: "AuditService.Service", type: "Effect Service", purpose: "Append-only audit trail — record, query, prune security events"},
+    {name: "TrustService.Service", type: "Effect Service", purpose: "Trust scoring — score actions 0-100, session trust decay"},
+    {name: "ConfinementService.Service", type: "Effect Service", purpose: "OS-level filesystem jail — per-platform backends"},
+    {name: "ScanningService.Service", type: "Effect Service", purpose: "Content scanning orchestration — register, scan, aggregate"},
+    {name: "DLPService.Service", type: "Effect Service", purpose: "Data loss prevention — outbound secrets/PII scanning, redaction"},
+    {name: "Session.Service", type: "Effect Service", purpose: "Session CRUD — create, list, get, messages, fork, revert"},
+    {name: "SessionPrompt.Service", type: "Effect Service", purpose: "Prompt orchestration — context building, tool resolution, LLM loop"},
+    {name: "LLM.Service", type: "Effect Service", purpose: "LLM streaming — provider resolution, streamText, tool call repair"},
+    {name: "ToolRegistry.Service", type: "Effect Service", purpose: "Tool registration & discovery — builtin, MCP, plugin, filtered by model"},
+    {name: "Config.Service", type: "Effect Service", purpose: "Configuration parsing & merging — 22 modules, deep merge chain"},
+    {name: "Bus.Service", type: "Effect Service", purpose: "Event bus — typed pub/sub, instance-scoped, global bridge"},
+    {name: "Permission.Service", type: "Effect Service", purpose: "Permission evaluation — ruleset, ask/reply, allow/deny/ask"},
+    {name: "LSP.Service", type: "Effect Service", purpose: "Language Server Protocol — diagnostics, symbols, file watchers"},
+    {name: "MCP.Service", type: "Effect Service", purpose: "Model Context Protocol — server connections, tool discovery, OAuth"},
+    {name: "Plugin.Service", type: "Effect Service", purpose: "Plugin system — npm package loading, lifecycle hooks"},
+    {name: "Server.Service", type: "Effect Service", purpose: "HTTP API server — Hono, routes, CORS, SSE, OpenAPI"},
+    {name: "GitHub.Service", type: "Effect Service", purpose: "GitHub integration — Actions agent, PR management, OIDC auth"},
+    {name: "InstanceStore.Service", type: "Effect Service", purpose: "Instance lifecycle — load, dispose, per-directory state"},
+    {name: "Auth.Service", type: "Effect Service", purpose: "Provider auth — API key, OAuth, well-known credential management"},
+    {name: "ModelRegistry.Service", type: "Effect Service", purpose: "Model approval/blocking — approve, block, report"}
+  ],
+
+  services: [
+    {name: "SecurityService", responsibility: "Root security interceptor — evaluate policy, scan content, confine paths, record audit"},
+    {name: "PolicyEngine", responsibility: "Policy document loading, validation, hierarchy merging, evaluation"},
+    {name: "AuditService", responsibility: "Append-only security event recording, querying, retention pruning"},
+    {name: "TrustService", responsibility: "Action trust scoring (0-100), threshold-based decisions, session decay"},
+    {name: "ConfinementService", responsibility: "OS-level path confinement (Landlock, sandbox-exec, restricted tokens)"},
+    {name: "ScanningService", responsibility: "Multi-scanner orchestration (Semgrep, YARA, entropy, secrets, injection)"},
+    {name: "SemgrepScanner", responsibility: "Static analysis via Semgrep CLI with bundled YAML rules"},
+    {name: "YaraScanner", responsibility: "Malware detection via YARA CLI with bundled signatures"},
+    {name: "EntropyScanner", responsibility: "High-entropy string detection for secrets and obfuscated payloads"},
+    {name: "SecretScanner", responsibility: "Credential pattern detection (50+ patterns: AWS, GitHub, SSH, JWT, etc.)"},
+    {name: "InjectionScanner", responsibility: "Prompt injection detection (role-override, system markers, unicode tricks)"},
+    {name: "DLPService", responsibility: "Outbound DLP: file classification, secrets/PII scanning, redaction engine"},
+    {name: "RedactionEngine", responsibility: "Replace sensitive values with typed placeholders in context"},
+    {name: "FileClassifier", responsibility: "File sensitivity classification (public/internal/confidential/restricted)"},
+    {name: "SessionService", responsibility: "Session CRUD, message storage, compaction, summarization, forking"},
+    {name: "SessionPrompt", responsibility: "Context building, tool resolution, LLM loop, subtask handling"},
+    {name: "LLMService", responsibility: "LLM provider resolution, streaming, tool call repair, retry logic"},
+    {name: "ToolRegistry", responsibility: "Tool definitions, registration, filtering by agent/model/permissions"},
+    {name: "ConfigService", responsibility: "Multi-source config loading, deep merging, 22 config modules"},
+    {name: "BusService", responsibility: "Typed pub/sub event bus with instance scoping and global bridge"},
+    {name: "PermissionService", responsibility: "Permission ruleset evaluation, ask/reply flow, DeniedError"},
+    {name: "LSPService", responsibility: "LSP client management, diagnostics, symbols, file watching"},
+    {name: "MCPService", responsibility: "MCP server connections, OAuth, tool/resource discovery"},
+    {name: "PluginService", responsibility: "Plugin scanning, loading, lifecycle hooks (onLoad, onUnload)"},
+    {name: "ServerService", responsibility: "HTTP server (Hono), auth, CORS, SSE, OpenAPI, mDNS"},
+    {name: "GitHubService", responsibility: "GitHub Actions agent, OIDC auth, PR creation, issue commenting"},
+    {name: "InstanceStore", responsibility: "Per-project instance lifecycle, config loading, service initialization"},
+    {name: "ProviderService", responsibility: "LLM provider resolution, credential management, SDK init"},
+    {name: "ModelRegistry", responsibility: "Model allow/block list, trust profiles, usage reports"},
+    {name: "ShellPTY", responsibility: "Cross-platform PTY abstraction (Bun + Node adapters)"}
+  ]
+};
+
+// ============================================================
+// DERIVED DATA
+// ============================================================
+const FLOW_COLORS = {};
+APP_DATA.flows.forEach(f => { FLOW_COLORS[f.id] = f.color });
+
+function buildDiagramNodes() {
+  const nodes = [];
+  const laneMap = { user: 0, screens: 1, providers: 2, services: 3, db: 4, external: 5 };
+  const seen = new Set();
+  APP_DATA.flows.forEach(f => {
+    Object.entries(f.nodes).forEach(([laneKey, items]) => {
+      items.forEach(label => {
+        const id = laneKey + "_" + label.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase();
+        if (!seen.has(id)) {
+          seen.add(id);
+          nodes.push({ id, lane: laneMap[laneKey], label, sub: "", type: laneKey });
+        }
+      });
+    });
+  });
+  return nodes;
+}
+const DIAGRAM_NODES = buildDiagramNodes();
+
+const FLOW_NODE_MAP = {};
+APP_DATA.flows.forEach(f => {
+  const ids = [];
+  Object.entries(f.nodes).forEach(([laneKey, items]) => {
+    items.forEach(label => {
+      const id = laneKey + "_" + label.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase();
+      ids.push(id);
+    });
+  });
+  FLOW_NODE_MAP[f.id] = ids;
+});
+
+function buildFlowConnections() {
+  const conns = {};
+  const lanes = Object.keys({ user:0, screens:1, providers:2, services:3, db:4, external:5 });
+  APP_DATA.flows.forEach(f => {
+    const pairs = [];
+    const allNodes = [];
+    lanes.forEach(l => {
+      (f.nodes[l] || []).forEach(label => {
+        const id = l + "_" + label.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase();
+        allNodes.push(id);
+      });
+    });
+    for (let i = 0; i < allNodes.length - 1; i++) {
+      pairs.push([allNodes[i], allNodes[i+1]]);
+    }
+    conns[f.id] = pairs;
+  });
+  return conns;
+}
+const FLOW_CONNECTIONS = buildFlowConnections();
+
+// ============================================================
+// RENDER
+// ============================================================
+let currentView = "cards";
+let currentSection = "all";
+let activeFlowId = null;
+
+function renderStats() {
+  const providers = new Set(); APP_DATA.flows.forEach(f => f.providers.forEach(p => providers.add(p)));
+  const services = new Set(); APP_DATA.flows.forEach(f => f.services.forEach(s => services.add(s)));
+  const dbTables = new Set(); APP_DATA.flows.forEach(f => f.db_tables.forEach(t => dbTables.add(t)));
+  const uniqSections = new Set(APP_DATA.flows.map(f => f.section));
+  document.getElementById("stats-strip").innerHTML = `
+    <div class="stat-item"><span class="stat-val">${APP_DATA.flows.length}</span><span class="stat-label">Flows</span></div>
+    <div class="stat-item"><span class="stat-val">${APP_DATA.flows.filter(f => f.section==='security').length}</span><span class="stat-label">Security Flows</span></div>
+    <div class="stat-item"><span class="stat-val">${APP_DATA.routes.length}</span><span class="stat-label">Routes</span></div>
+    <div class="stat-item"><span class="stat-val">${providers.size}</span><span class="stat-label">Providers</span></div>
+    <div class="stat-item"><span class="stat-val">${services.size}</span><span class="stat-label">Services</span></div>
+    <div class="stat-item"><span class="stat-val">${APP_DATA.services.filter(s => s.name.includes('Scanner') || s.name.includes('Security')).length}</span><span class="stat-label">Security Services</span></div>
+    <div class="stat-item"><span class="stat-val">${dbTables.size}</span><span class="stat-label">DB Tables</span></div>
+    <div class="stat-item"><span class="stat-val">22+</span><span class="stat-label">AI Providers</span></div>
+  `;
+}
+
+function renderFlowCards(filterSection, searchTerm) {
+  const grid = document.getElementById("flow-grid");
+  const noRes = document.getElementById("no-results");
+  let items = APP_DATA.flows;
+  if (filterSection && filterSection !== "all") {
+    items = items.filter(f => f.section === filterSection);
+  }
+  if (searchTerm) {
+    const q = searchTerm.toLowerCase();
+    items = items.filter(f =>
+      f.name.toLowerCase().includes(q) ||
+      f.summary.toLowerCase().includes(q) ||
+      f.route.toLowerCase().includes(q) ||
+      f.services.some(s => s.toLowerCase().includes(q)) ||
+      f.providers.some(p => p.toLowerCase().includes(q)) ||
+      f.db_tables.some(t => t.toLowerCase().includes(q)) ||
+      f.tags.some(t => t[0].toLowerCase().includes(q))
+    );
+  }
+  if (items.length === 0) {
+    grid.innerHTML = "";
+    noRes.classList.add("show");
+    return;
+  }
+  noRes.classList.remove("show");
+  grid.innerHTML = items.map(f => `
+    <div class="flow-card" onclick="openModal('${f.id}')" data-section="${f.section}">
+      <div class="card-header">
+        <div class="card-icon" style="background:${f.color}22;color:${f.color}">${f.icon}</div>
+        <div class="card-name" style="color:${f.color}">${highlight(f.name, searchTerm)}</div>
+      </div>
+      <div class="card-route">${highlight(f.route, searchTerm)}</div>
+      <div class="card-summary">${highlight(f.summary, searchTerm)}</div>
+      <div class="card-tags">${f.tags.map(t => `<span class="tag ${t[1]}">${t[0]}</span>`).join("")}</div>
+    </div>
+  `).join("");
+}
+
+function highlight(text, term) {
+  if (!term) return text;
+  const q = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return text.replace(new RegExp(q, 'gi'), m => `<mark>${m}</mark>`);
+}
+
+function openModal(flowId) {
+  const f = APP_DATA.flows.find(x => x.id === flowId);
+  if (!f) return;
+  document.getElementById("modal-body").innerHTML = `
+    <div class="modal-icon" style="background:${f.color}22;color:${f.color}">${f.icon}</div>
+    <div class="modal-title">${f.name}</div>
+    <div class="modal-route">${f.route}</div>
+    <div class="modal-grid">
+      <div class="mg-item"><div class="mg-label">Entry</div><div class="mg-value">${f.entry}</div></div>
+      <div class="mg-item"><div class="mg-label">Exit</div><div class="mg-value">${f.exit}</div></div>
+    </div>
+    <div class="modal-section">
+      <div class="ms-head">Summary</div>
+      <p>${f.summary}</p>
+    </div>
+    <div class="modal-section">
+      <div class="ms-head">Steps (${f.steps.length})</div>
+      <ol>${f.steps.map(s => `<li>${s.replace(/^\d+\.\s*/, '')}</li>`).join("")}</ol>
+    </div>
+    <div class="modal-grid">
+      <div class="mg-item"><div class="mg-label">Services</div><div class="mg-value">${f.services.join(", ")}</div></div>
+      <div class="mg-item"><div class="mg-label">Providers</div><div class="mg-value">${f.providers.join(", ")}</div></div>
+    </div>
+    <div class="modal-section">
+      <div class="ms-head">DB Tables</div>
+      <p>${f.db_tables.join(", ")}</p>
+    </div>
+    <div class="modal-section">
+      <div class="ms-head">Tags</div>
+      <div class="card-tags">${f.tags.map(t => `<span class="tag ${t[1]}">${t[0]}</span>`).join(" ")}</div>
+    </div>
+  `;
+  document.getElementById("modal-overlay").classList.add("show");
+}
+
+function closeModal() {
+  document.getElementById("modal-overlay").classList.remove("show");
+}
+
+// ============================================================
+// SEARCH & FILTER
+// ============================================================
+function onSearch() {
+  const q = document.getElementById("search-input").value;
+  renderFlowCards(currentSection, q);
+}
+
+function filterSection(section, el) {
+  document.querySelectorAll("#sidebar .filter-item").forEach(e => e.classList.remove("active"));
+  el.classList.add("active");
+  currentSection = section;
+  if (section === "routes" || section === "providers" || section === "services") {
+    showReferenceTable(section);
+    return;
+  }
+  const searchTerm = document.getElementById("search-input").value;
+  if (currentView !== "cards") switchView("cards", document.querySelector('.view-tab'));
+  renderFlowCards(section, searchTerm);
+}
+
+function showReferenceTable(type) {
+  if (currentView !== "cards") switchView("cards", document.querySelector('.view-tab'));
+  document.getElementById("stats-strip").innerHTML = "";
+  const grid = document.getElementById("flow-grid");
+  document.getElementById("no-results").classList.remove("show");
+  if (type === "routes") {
+    grid.innerHTML = `<div style="background:#181b24;border:1px solid #2a2f3f;border-radius:10px;padding:20px;grid-column:1/-1">
+      <h3 style="margin-bottom:14px;color:#f1f5f9;font-size:15px">All CLI Routes</h3>
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="color:#64748b;text-align:left"><th style="padding:6px 10px;border-bottom:1px solid #2a2f3f">Path</th><th style="padding:6px 10px;border-bottom:1px solid #2a2f3f">Screen</th><th style="padding:6px 10px;border-bottom:1px solid #2a2f3f">Notes</th></tr></thead>
+        <tbody>${APP_DATA.routes.map(r => `<tr><td style="padding:6px 10px;border-bottom:1px solid #1e2230;font-family:monospace;color:#5b8af4">${r.path}</td><td style="padding:6px 10px;border-bottom:1px solid #1e2230;color:#e2e8f0">${r.screen}</td><td style="padding:6px 10px;border-bottom:1px solid #1e2230;color:#94a3b8">${r.notes}</td></tr>`).join("")}</tbody>
+      </table>
+    </div>`;
+  } else if (type === "providers") {
+    grid.innerHTML = `<div style="background:#181b24;border:1px solid #2a2f3f;border-radius:10px;padding:20px;grid-column:1/-1">
+      <h3 style="margin-bottom:14px;color:#f1f5f9;font-size:15px">All Services / Providers</h3>
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="color:#64748b;text-align:left"><th style="padding:6px 10px;border-bottom:1px solid #2a2f3f">Name</th><th style="padding:6px 10px;border-bottom:1px solid #2a2f3f">Type</th><th style="padding:6px 10px;border-bottom:1px solid #2a2f3f">Purpose</th></tr></thead>
+        <tbody>${APP_DATA.providers.map(p => `<tr><td style="padding:6px 10px;border-bottom:1px solid #1e2230;font-family:monospace;color:#a78bfa">${p.name}</td><td style="padding:6px 10px;border-bottom:1px solid #1e2230"><span class="tag ${p.type==='Effect Service'?'blue':'green'}">${p.type}</span></td><td style="padding:6px 10px;border-bottom:1px solid #1e2230;color:#94a3b8">${p.purpose}</td></tr>`).join("")}</tbody>
+      </table>
+    </div>`;
+  } else if (type === "services") {
+    grid.innerHTML = `<div style="background:#181b24;border:1px solid #2a2f3f;border-radius:10px;padding:20px;grid-column:1/-1">
+      <h3 style="margin-bottom:14px;color:#f1f5f9;font-size:15px">All Service Classes</h3>
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="color:#64748b;text-align:left"><th style="padding:6px 10px;border-bottom:1px solid #2a2f3f">Service</th><th style="padding:6px 10px;border-bottom:1px solid #2a2f3f">Responsibility</th></tr></thead>
+        <tbody>${APP_DATA.services.map(s => `<tr><td style="padding:6px 10px;border-bottom:1px solid #1e2230;font-family:monospace;color:#fbbf24">${s.name}</td><td style="padding:6px 10px;border-bottom:1px solid #1e2230;color:#94a3b8">${s.responsibility}</td></tr>`).join("")}</tbody>
+      </table>
+    </div>`;
+  }
+}
+
+// ============================================================
+// VIEW SWITCHING
+// ============================================================
+function switchView(view, btn) {
+  document.querySelectorAll(".view-tab").forEach(t => t.classList.remove("active"));
+  if (btn) btn.classList.add("active");
+  document.querySelectorAll(".view-pane").forEach(p => p.classList.remove("active"));
+  currentView = view;
+  if (view === "cards") {
+    document.getElementById("cards-view").classList.add("active");
+    const searchTerm = document.getElementById("search-input").value;
+    renderFlowCards(currentSection, searchTerm);
+  } else {
+    document.getElementById("diagram-view").classList.add("active");
+    renderStats();
+    buildDiagram();
+  }
+}
+
+// ============================================================
+// DIAGRAM
+// ============================================================
+function buildDiagram() {
+  const lanes = [
+    { name: "User / Entry", color: "#34d399" },
+    { name: "Screens", color: "#5b8af4" },
+    { name: "Providers", color: "#a78bfa" },
+    { name: "Services", color: "#fbbf24" },
+    { name: "Database", color: "#22d3ee" },
+    { name: "External", color: "#64748b" }
+  ];
+
+  const laneEls = document.getElementById("diagram-lanes");
+  laneEls.innerHTML = lanes.map((l, i) => `
+    <div class="diagram-lane" data-lane="${i}">
+      <div class="lane-header"><span class="lane-dot lane-color-${i}"></span>${l.name}</div>
+      <div class="lane-nodes" data-lane="${i}"></div>
+    </div>
+  `).join("");
+
+  DIAGRAM_NODES.forEach(node => {
+    const container = laneEls.querySelector(`.lane-nodes[data-lane="${node.lane}"]`);
+    const types = ["cli","developer","administrator","api_client","remote_client","github_user","security_team"];
+    const icon = types.includes(node.type) ? "👤" : node.type === "screens" ? "📄" : node.type === "providers" ? "⚡" : node.type === "services" ? "⚙" : node.type === "db" ? "🗄" : "🌐";
+    const el = document.createElement("div");
+    el.className = "diagram-node";
+    el.id = "node-" + node.id;
+    el.innerHTML = `<div class="node-label">${icon} ${node.label}</div>${node.sub ? `<div class="node-sub">${node.sub}</div>` : ""}`;
+    el.onclick = () => onNodeClick(node.id);
+    container.appendChild(el);
+  });
+
+  // Build legend
+  document.getElementById("legend-strip").innerHTML = lanes.map((l, i) =>
+    `<span class="legend-item"><span class="legend-dot" style="background:${l.color}"></span>${l.name}</span>`
+  ).join("");
+
+  // Build flow list
+  buildFlowList();
+
+  // Initial connections redraw after layout
+  requestAnimationFrame(() => {
+    if (activeFlowId) drawConnections(activeFlowId);
+  });
+}
+
+function buildFlowList() {
+  const list = document.getElementById("flow-list");
+  list.innerHTML = APP_DATA.flows.map(f => `
+    <div class="flow-list-item${f.id === activeFlowId ? ' active' : ''}" data-flow="${f.id}" onclick="selectFlow('${f.id}')">
+      <span style="color:${f.color}">${f.icon}</span> ${f.name}
+    </div>
+  `).join("");
+  renderFlowSteps();
+}
+
+function renderFlowSteps() {
+  const panel = document.getElementById("flow-steps-panel");
+  const f = APP_DATA.flows.find(x => x.id === activeFlowId);
+  if (!f) {
+    panel.innerHTML = `<div class="step-title">Select a flow to see steps</div>`;
+    return;
+  }
+  panel.innerHTML = `<div class="step-title">${f.icon} ${f.name} — Steps</div>
+    ${f.steps.map(s => `<div class="step-item"><span class="step-num">${s.match(/^(\d+)/)?.[1] || '•'}</span>${s.replace(/^\d+\.\s*/, '')}</div>`).join("")}
+  `;
+}
+
+let selectedFirstNode = null;
+
+function onNodeClick(nodeId) {
+  // Find first flow that uses this node
+  const flowEntry = Object.entries(FLOW_NODE_MAP).find(([_, nodes]) => nodes.includes(nodeId));
+  if (!flowEntry) return;
+  const flowId = flowEntry[0];
+  if (flowId === activeFlowId && selectedFirstNode === nodeId) {
+    // Second click: open modal
+    openModal(flowId);
+    return;
+  }
+  selectedFirstNode = nodeId;
+  selectFlow(flowId);
+}
+
+// ============================================================
+// FLOW SELECTION
+// ============================================================
+function selectFlow(id) {
+  if (activeFlowId === id) {
+    clearFlowSelection();
+    return;
+  }
+  activeFlowId = id;
+
+  // Dim all nodes, activate matching
+  document.querySelectorAll(".diagram-node").forEach(n => n.classList.add("dimmed"));
+  document.querySelectorAll(".diagram-node.active").forEach(n => n.classList.remove("active"));
+  (FLOW_NODE_MAP[id] || []).forEach(nid => {
+    const el = document.getElementById("node-" + nid);
+    if (el) { el.classList.remove("dimmed"); el.classList.add("active"); }
+  });
+
+  // Update flow list
+  document.querySelectorAll(".flow-list-item").forEach(i => i.classList.remove("active"));
+  const li = document.querySelector(`.flow-list-item[data-flow="${id}"]`);
+  if (li) li.classList.add("active");
+
+  drawConnections(id);
+  renderFlowSteps();
+}
+
+function clearFlowSelection() {
+  activeFlowId = null;
+  selectedFirstNode = null;
+  document.querySelectorAll(".diagram-node").forEach(n => { n.classList.remove("dimmed"); n.classList.remove("active"); });
+  document.querySelectorAll(".flow-list-item").forEach(i => i.classList.remove("active"));
+  const svg = document.getElementById("connections-svg");
+  svg.innerHTML = "";
+  renderFlowSteps();
+}
+
+function drawConnections(flowId) {
+  const svg = document.getElementById("connections-svg");
+  const canvas = document.getElementById("diagram-canvas");
+  const rect = canvas.getBoundingClientRect();
+  svg.setAttribute("width", rect.width);
+  svg.setAttribute("height", rect.height);
+
+  const lanes = canvas.querySelectorAll(".diagram-lane");
+  const laneRects = [];
+  lanes.forEach((l, i) => {
+    const r = l.getBoundingClientRect();
+    laneRects[i] = { left: r.left - rect.left, right: r.right - rect.left, width: r.width };
+  });
+
+  const pairs = FLOW_CONNECTIONS[flowId] || [];
+  const color = FLOW_COLORS[flowId] || "#5b8af4";
+  let paths = "";
+
+  pairs.forEach(([fromId, toId]) => {
+    const fromEl = document.getElementById("node-" + fromId);
+    const toEl = document.getElementById("node-" + toId);
+    if (!fromEl || !toEl) return;
+
+    const fromRect = fromEl.getBoundingClientRect();
+    const toRect = toEl.getBoundingClientRect();
+
+    const x1 = fromRect.left - rect.left + fromRect.width;
+    const y1 = fromRect.top - rect.top + fromRect.height / 2;
+    const x2 = toRect.left - rect.left;
+    const y2 = toRect.top - rect.top + toRect.height / 2;
+
+    const cx1 = x1 + Math.abs(x2 - x1) * 0.4;
+    const cy1 = y1;
+    const cx2 = x2 - Math.abs(x2 - x1) * 0.4;
+    const cy2 = y2;
+
+    paths += `<path d="M${x1},${y1} C${cx1},${cy1} ${cx2},${cy2} ${x2},${y2}" stroke="${color}" stroke-width="1.5" fill="none" class="connection-path" marker-end="url(#arrow-${flowId.replace(/[^a-z0-9]/g,'')})"/>`;
+  });
+
+  svg.innerHTML = `
+    <defs>
+      <marker id="arrow-${flowId.replace(/[^a-z0-9]/g,'')}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+        <path d="M0,0 L10,5 L0,10 Z" fill="${color}"/>
+      </marker>
+    </defs>
+    ${paths}
+  `;
+}
+
+// Redraw connections on scroll/resize
+let redrawTimer;
+document.getElementById("diagram-wrap")?.addEventListener("scroll", () => {
+  clearTimeout(redrawTimer);
+  redrawTimer = setTimeout(() => { if (activeFlowId) drawConnections(activeFlowId); }, 100);
+});
+window.addEventListener("resize", () => {
+  clearTimeout(redrawTimer);
+  redrawTimer = setTimeout(() => { if (activeFlowId) drawConnections(activeFlowId); }, 100);
+});
+
+// Keyboard: Escape closes modal
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") closeModal();
+});
+
+// ============================================================
+// INIT
+// ============================================================
+renderStats();
+renderFlowCards("all", "");
+renderStats();
+</script>
+</body>
+</html>
