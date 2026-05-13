@@ -1,6 +1,7 @@
 import { DialogSelect, type DialogSelectOption } from "@tui/ui/dialog-select"
 import { createResource, createMemo } from "solid-js"
 import { useDialog } from "@tui/ui/dialog"
+import { useProject } from "@tui/context/project"
 import { useSDK } from "@tui/context/sdk"
 import { Glob } from "@opencode-ai/core/util/glob"
 import { ConfigMarkdown } from "@/config/markdown"
@@ -18,12 +19,7 @@ export type DialogTemplateProps = {
   onSelect: (template: TemplateInfo) => void
 }
 
-async function scanTemplates(directory: string): Promise<TemplateInfo[]> {
-  const dirs = [
-    path.join(Global.Path.config, "templates"),
-    path.join(directory, "templates"),
-  ]
-
+async function scanTemplates(dirs: string[]): Promise<TemplateInfo[]> {
   const seen = new Map<string, TemplateInfo>()
 
   for (const dir of dirs) {
@@ -65,10 +61,19 @@ async function scanTemplates(directory: string): Promise<TemplateInfo[]> {
 export function DialogTemplate(props: DialogTemplateProps) {
   const dialog = useDialog()
   const sdk = useSDK()
-  const directory = sdk.directory || process.cwd()
+  const project = useProject()
   dialog.setSize("large")
 
-  const [templates] = createResource(() => scanTemplates(directory))
+  const [templates] = createResource(async () => {
+    const cwd = sdk.directory || process.cwd()
+    const worktree = project.instance.path().worktree
+
+    const dirs = [path.join(Global.Path.config, "templates")]
+    if (worktree) dirs.push(path.join(worktree, "templates"))
+    if (cwd !== worktree) dirs.push(path.join(cwd, "templates"))
+
+    return scanTemplates(dirs)
+  })
 
   const options = createMemo<DialogSelectOption<TemplateInfo>[]>(() => {
     const list = templates() ?? []
