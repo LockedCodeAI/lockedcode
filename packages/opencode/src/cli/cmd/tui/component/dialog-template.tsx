@@ -1,18 +1,75 @@
 import { DialogSelect, type DialogSelectOption } from "@tui/ui/dialog-select"
 import { createResource, createMemo } from "solid-js"
 import { useDialog } from "@tui/ui/dialog"
-import { useProject } from "@tui/context/project"
 import { useSync } from "@tui/context/sync"
-import { useSDK } from "@tui/context/sdk"
 import { Glob } from "@opencode-ai/core/util/glob"
 import { ConfigMarkdown } from "@/config/markdown"
-import { Global } from "@opencode-ai/core/global"
 import * as Log from "@opencode-ai/core/util/log"
+import os from "os"
 import path from "path"
 import fs from "fs/promises"
 
 const log = Log.create({ service: "templates" })
-const cacheDir = path.join(Global.Path.cache, "templates")
+const templatesDir = path.join(os.homedir(), ".lockedcode", "templates")
+const cacheDir = path.join(templatesDir, ".cache")
+
+const DEFAULT_TEMPLATES: Array<{ dir: string; file: string; content: string }> = [
+  {
+    dir: "code-review",
+    file: "code-review.md",
+    content: `---
+name: code-review
+description: Review recent changes for quality, correctness, and style
+---
+
+Review the recent changes on this branch compared to the base branch. Evaluate:
+- Correctness and edge cases
+- Error handling
+- Performance implications
+- Code style and readability
+- Test coverage gaps
+- Security considerations
+
+Provide actionable feedback organized by severity.
+`,
+  },
+  {
+    dir: "security-audit",
+    file: "security-audit.md",
+    content: `---
+name: security-audit
+description: Run a comprehensive security audit on the current project
+---
+
+Perform a comprehensive security audit of this project. Focus on:
+- OWASP Top 10 vulnerabilities
+- Dependency vulnerabilities (check package.json / lock files)
+- Secret/credential exposure in source code
+- Injection risks (SQL, command, XSS)
+- Authentication and authorization flaws
+- Insecure configurations
+
+Report findings with severity levels and remediation steps.
+`,
+  },
+]
+
+async function seedDefaults() {
+  try {
+    const entries = await fs.readdir(templatesDir).catch(() => [])
+    const hasUserTemplates = entries.some((e) => e !== ".cache")
+    if (hasUserTemplates) return
+
+    for (const tmpl of DEFAULT_TEMPLATES) {
+      const dir = path.join(templatesDir, tmpl.dir)
+      await fs.mkdir(dir, { recursive: true })
+      await fs.writeFile(path.join(dir, tmpl.file), tmpl.content)
+    }
+    log.info("seeded default templates", { dir: templatesDir })
+  } catch (err) {
+    log.warn("failed to seed default templates", { err })
+  }
+}
 
 interface TemplateInfo {
   name: string
@@ -77,7 +134,6 @@ async function fetchRemoteTemplates(urls: string[]): Promise<TemplateInfo[]> {
           })
         } catch (err) {
           log.warn("failed to process remote template", { name: entry.name, err })
-          // Try cached version
           try {
             const md = await ConfigMarkdown.parse(dest)
             const frontmatter = md.data as Record<string, unknown>
@@ -96,7 +152,6 @@ async function fetchRemoteTemplates(urls: string[]): Promise<TemplateInfo[]> {
     } catch (err) {
       log.warn("failed to fetch template index", { url: indexUrl, err })
 
-      // Fall back to any cached templates from this URL
       try {
         const cached = await Glob.scan("*/*.md", { cwd: cacheDir, absolute: true, include: "file" })
         for (const match of cached) {
@@ -139,7 +194,7 @@ async function scanLocalTemplates(dirs: string[]): Promise<TemplateInfo[]> {
       continue
     }
 
-    for (const match of matches) {
+    for (const match of matches.filter((m) => !m.includes("/.cache/"))) {
       try {
         const md = await ConfigMarkdown.parse(match)
         const frontmatter = md.data as Record<string, unknown>
@@ -165,36 +220,28 @@ async function scanLocalTemplates(dirs: string[]): Promise<TemplateInfo[]> {
 
 export function DialogTemplate(props: DialogTemplateProps) {
   const dialog = useDialog()
-  const sdk = useSDK()
-  const project = useProject()
   const sync = useSync()
   dialog.setSize("large")
 
-  const [templates] = createResource(
-    () => project.instance.path().worktree || sdk.directory || process.cwd(),
-    async (worktree) => {
-      const cwd = sdk.directory || process.cwd()
+  const [templates] = createResource(async () => {
+    await seedDefaults()
 
-      // Remote templates (lowest precedence)
-      const urls = (sync.data.config as Record<string, unknown>).templates as
-        | { urls?: string[] }
-        | undefined
-      const remote = urls?.urls?.length ? await fetchRemoteTemplates(urls.urls) : []
+    // Remote templates (lowest precedence)
+    const urls = (sync.data.config as Record<string, unknown>).templates as
+      | { urls?: string[] }
+      | undefined
+    const remote = urls?.urls?.length ? await fetchRemoteTemplates(urls.urls) : []
 
-      // Local templates (highest precedence — project overrides global overrides remote)
-      const localDirs = [path.join(Global.Path.config, "templates")]
-      localDirs.push(path.join(worktree, "templates"))
-      if (cwd !== worktree) localDirs.push(path.join(cwd, "templates"))
-      const local = await scanLocalTemplates(localDirs)
+    // Local templates from ~/.lockedcode/templates/
+    const local = await scanLocalTemplates([templatesDir])
 
-      // Merge: local wins on name collision
-      const merged = new Map<string, TemplateInfo>()
-      for (const t of remote) merged.set(t.name, t)
-      for (const t of local) merged.set(t.name, t)
+    // Merge: local wins on name collision
+    const merged = new Map<string, TemplateInfo>()
+    for (const t of remote) merged.set(t.name, t)
+    for (const t of local) merged.set(t.name, t)
 
-      return Array.from(merged.values()).sort((a, b) => a.name.localeCompare(b.name))
-    },
-  )
+    return Array.from(merged.values()).sort((a, b) => a.name.localeCompare(b.name))
+  })
 
   const options = createMemo<DialogSelectOption<TemplateInfo>[]>(() => {
     const list = templates() ?? []
