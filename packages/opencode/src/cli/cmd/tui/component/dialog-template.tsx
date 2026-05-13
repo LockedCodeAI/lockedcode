@@ -130,7 +130,7 @@ async function scanLocalTemplates(dirs: string[]): Promise<TemplateInfo[]> {
   for (const dir of dirs) {
     let matches: string[]
     try {
-      matches = await Glob.scan("*.md", {
+      matches = await Glob.scan("**/*.md", {
         cwd: dir,
         absolute: true,
         include: "file",

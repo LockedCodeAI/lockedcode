@@ -6,6 +6,9 @@
       "packages/opencode/migration/*": "ask",
     },
   },
+  "templates": {
+    "urls": ["https://raw.githubusercontent.com/LockedCodeAI/lockedcode/dev/templates/"],
+  },
   "mcp": {},
   "tools": {
     "github-triage": false,
