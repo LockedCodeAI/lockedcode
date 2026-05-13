@@ -369,6 +369,78 @@ lockedcode siem stream --host <h> --port <p>  # Stream events to syslog
 
 ---
 
+## Templates
+
+LockedCode includes a `/templates` slash command that lets you browse and instantly submit reusable prompt templates. Type `/templates` in the prompt to open an interactive picker.
+
+### Template file format
+
+Create `.md` files with optional YAML frontmatter:
+
+```markdown
+---
+name: security-audit
+description: Run a comprehensive security audit on the current project
+---
+
+Perform a comprehensive security audit of this project. Focus on:
+- OWASP Top 10 vulnerabilities
+- Dependency vulnerabilities
+- Secret/credential exposure
+```
+
+If no frontmatter is present, the template name is derived from the filename (e.g., `security-audit.md` becomes `security-audit`).
+
+### Template sources
+
+Templates are loaded from three locations, in order of precedence (highest first):
+
+| Source | Path | Use case |
+|--------|------|----------|
+| **Project** | `./templates/*.md` | Project-specific templates, checked into the repo |
+| **Global** | `~/.config/opencode/templates/*.md` | Personal templates shared across all projects |
+| **Remote** | Configured via `templates.urls` | Centrally managed team/org templates |
+
+When names collide, local templates always override remote ones.
+
+### Remote template sources
+
+To pull templates from a central repository, add a `templates` section to your `opencode.json`:
+
+```jsonc
+{
+  "templates": {
+    "urls": ["https://raw.githubusercontent.com/YourOrg/templates/main/"]
+  }
+}
+```
+
+Each URL must point to a directory serving an `index.json` that lists available templates:
+
+```json
+{
+  "templates": [
+    { "name": "security-audit", "files": ["security-audit.md"] },
+    { "name": "code-review", "files": ["code-review.md"] },
+    { "name": "incident-response", "files": ["incident-response.md"] }
+  ]
+}
+```
+
+The corresponding `.md` files are organized by name:
+
+```
+templates/
+├── index.json
+├── security-audit/security-audit.md
+├── code-review/code-review.md
+└── incident-response/incident-response.md
+```
+
+Remote templates are cached locally at `~/.cache/opencode/templates/` and work offline after the first fetch.
+
+---
+
 ## Agents
 
 LockedCode includes the same built-in agents as OpenCode, with security policies applied to all of them:

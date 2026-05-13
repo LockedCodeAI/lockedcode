@@ -40,6 +40,7 @@ import { ConfigProvider } from "./provider"
 import { ConfigReference } from "./reference"
 import { ConfigServer } from "./server"
 import { ConfigSkills } from "./skills"
+import { ConfigTemplates } from "./templates"
 import { ConfigVariable } from "./variable"
 import { Npm } from "@opencode-ai/core/npm"
 
@@ -143,6 +144,9 @@ export const Info = Schema.Struct({
     description: "Command configuration, see https://lockedcode.ai/docs/commands",
   }),
   skills: Schema.optional(ConfigSkills.Info).annotate({ description: "Additional skill folder paths" }),
+  templates: Schema.optional(ConfigTemplates.Info).annotate({
+    description: "Remote template sources — URLs serving an index.json of .md template files",
+  }),
   reference: Schema.optional(ConfigReference.Info).annotate({
     description: "Named git or local directory references that can be @ mentioned as Scout-backed subagents",
   }),
