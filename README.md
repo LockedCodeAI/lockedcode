@@ -278,6 +278,8 @@ scoop install lockedcode
 
 ### Desktop App
 
+NOTICE:  THESE LINKS DO NOT WORK.  THIS SECTION IS A PLACEHOLDER FOR NOW.  WE WILL BE BUILDING THE ACTUAL INSTALLATION FILES SOON.  FOR NOW, CLONE THE REPO AND BUILD/RUN LOCALLY
+
 LockedCode is also available as a desktop application. Download directly from the [releases page](https://github.com/LockedCodeAI/lockedcode/releases) or [lockedcode.ai/download](https://lockedcode.ai/download).
 
 | Platform              | Download                              |
