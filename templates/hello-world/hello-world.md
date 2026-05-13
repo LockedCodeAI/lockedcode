@@ -1,1 +1,6 @@
-say hello to the user
+---
+name: hello-world
+description: Hello world
+---
+
+Say "hello world" to the user
