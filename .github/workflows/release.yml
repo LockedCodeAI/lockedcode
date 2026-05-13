@@ -1,0 +1,104 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (e.g. 1.2.0 — without the v prefix)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Extract version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            V="${{ inputs.version }}"
+          else
+            V="${GITHUB_REF_NAME#v}"
+          fi
+          if ! echo "$V" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+'; then
+            echo "::error::Invalid version: $V"
+            exit 1
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "Publishing version $V"
+
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-bun
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Check if already published
+        id: check
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          if npm view "lockedcode@${VERSION}" version 2>/dev/null; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "lockedcode@${VERSION} already published — skipping"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set package version
+        if: steps.check.outputs.skip == 'false'
+        working-directory: packages/opencode
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          bun -e "
+            const text = await Bun.file('package.json').text()
+            await Bun.write('package.json', text.replace(/\"version\": \"[^\"]+\"/, '\"version\": \"${VERSION}\"'))
+          "
+
+      - name: Pack and publish
+        if: steps.check.outputs.skip == 'false'
+        working-directory: packages/opencode
+        run: |
+          bun pm pack
+          npm publish *.tgz --tag latest --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  github-release:
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create tag (workflow_dispatch only)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          VERSION="${{ needs.publish.outputs.version }}"
+          git tag "v${VERSION}"
+          git push origin "v${VERSION}"
+
+      - name: Create GitHub Release
+        run: |
+          VERSION="${{ needs.publish.outputs.version }}"
+          gh release create "v${VERSION}" \
+            --title "v${VERSION}" \
+            --generate-notes \
+            --latest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
