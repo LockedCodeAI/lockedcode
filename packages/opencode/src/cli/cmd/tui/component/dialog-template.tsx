@@ -1,7 +1,7 @@
 import { DialogSelect, type DialogSelectOption } from "@tui/ui/dialog-select"
 import { createResource, createMemo } from "solid-js"
 import { useDialog } from "@tui/ui/dialog"
-import { useProject } from "@tui/context/project"
+import { useSDK } from "@tui/context/sdk"
 import { Glob } from "@opencode-ai/core/util/glob"
 import { ConfigMarkdown } from "@/config/markdown"
 import { Global } from "@opencode-ai/core/global"
@@ -64,13 +64,11 @@ async function scanTemplates(directory: string): Promise<TemplateInfo[]> {
 
 export function DialogTemplate(props: DialogTemplateProps) {
   const dialog = useDialog()
-  const project = useProject()
+  const sdk = useSDK()
+  const directory = sdk.directory || process.cwd()
   dialog.setSize("large")
 
-  const [templates] = createResource(
-    () => project.instance.directory(),
-    (directory) => scanTemplates(directory),
-  )
+  const [templates] = createResource(() => scanTemplates(directory))
 
   const options = createMemo<DialogSelectOption<TemplateInfo>[]>(() => {
     const list = templates() ?? []
