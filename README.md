@@ -398,7 +398,7 @@ Templates are loaded from three locations, in order of precedence (highest first
 | Source | Path | Use case |
 |--------|------|----------|
 | **Project** | `./templates/*.md` | Project-specific templates, checked into the repo |
-| **Global** | `~/.config/opencode/templates/*.md` | Personal templates shared across all projects |
+| **Global** | `~/.lockedcode/templates/one-of-many-template-folders/one-of-many-template-files.md` | Personal templates shared across all projects |
 | **Remote** | Configured via `templates.urls` | Centrally managed team/org templates |
 
 When names collide, local templates always override remote ones.
