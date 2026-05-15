@@ -50,7 +50,7 @@ export const LandlockBackend: ConfinementBackend = {
     //   b) A C helper binary compiled at install time
     //   c) The system's landlock-restrict tool
 
-    log.warn("Landlock: native syscall not implemented — activate() returning false. Use Bubblewrap or application-level confinement.")
+    log.warn("Landlock: kernel detected but native syscall not implemented — activate() returning false")
     return false
   },
   deactivate: () => {
@@ -63,8 +63,6 @@ export const LandlockBackend: ConfinementBackend = {
   },
   isActive: () => active,
   getEnforcementLevel: (): "kernel" | "namespace" | "application" => {
-    // Native Landlock syscalls are not yet implemented — always report application-level.
-    // Only return "kernel" once landlock_create_ruleset et al. are actually invoked.
     return "application"
   },
 }

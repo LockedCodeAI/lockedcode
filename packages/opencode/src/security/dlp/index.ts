@@ -1,7 +1,7 @@
 import { Context, Effect, Layer } from "effect"
 import * as Log from "@opencode-ai/core/util/log"
 import type { DLPResult, DLPDetection, Severity, FileSensitivity } from "../types"
-import { defaultSecurityConfig } from "../types"
+import { Service as SecurityConfigService } from "../config"
 import { SECRET_PATTERNS } from "../secrets/patterns"
 import { isPlaceholder } from "../secrets/context"
 import { PII_PATTERNS, createSnippet } from "./pii-patterns"
@@ -21,7 +21,8 @@ export class Service extends Context.Service<Service, Interface>()("@lockedcode/
 export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
-    const cfg = defaultSecurityConfig.dlp
+    const configSvc = yield* SecurityConfigService
+    const cfg = configSvc.get().dlp
 
     const runScan = Effect.fn("DLP.runScan")(function* (content: string) {
       if (content.length === 0) return { status: "clean", detections: [] } as DLPResult
@@ -143,4 +144,6 @@ export const layer = Layer.effect(
   }),
 )
 
-export const defaultLayer = layer
+import { defaultLayer as SecurityConfigLayer } from "../config"
+
+export const defaultLayer = layer.pipe(Layer.provide(SecurityConfigLayer))

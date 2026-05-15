@@ -65,6 +65,6 @@ export const MacOSSandboxBackend: ConfinementBackend = {
   },
   isActive: () => active,
   getEnforcementLevel: (): "kernel" | "namespace" | "application" => {
-    return active ? "application" : "application"
+    return active ? "kernel" : "application"
   },
 }

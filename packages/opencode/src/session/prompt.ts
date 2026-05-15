@@ -476,6 +476,16 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                   messageID: input.processor.message.id,
                   agent: input.agent.name,
                 })
+                yield* secOpt.recordAuditEvent({
+                  eventType: "security.scan_started",
+                  sessionId: ctx.sessionID,
+                  timestamp: Date.now(),
+                  severity: "info",
+                  toolName: key,
+                  modelId: input.agent.name,
+                  actionTaken: "allowed",
+                  details: { source: "mcp", callId: opts.toolCallId },
+                })
               }
 
               yield* plugin.trigger(
@@ -501,6 +511,19 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                 { tool: key, sessionID: ctx.sessionID, callID: opts.toolCallId, args },
                 result,
               )
+
+              if (secOpt) {
+                yield* secOpt.recordAuditEvent({
+                  eventType: "security.scan_completed",
+                  sessionId: ctx.sessionID,
+                  timestamp: Date.now(),
+                  severity: "info",
+                  toolName: key,
+                  modelId: input.agent.name,
+                  actionTaken: "allowed",
+                  details: { source: "mcp", callId: opts.toolCallId, contentItems: result.content.length },
+                })
+              }
 
               const textParts: string[] = []
               const attachments: Omit<MessageV2.FilePart, "id" | "sessionID" | "messageID">[] = []

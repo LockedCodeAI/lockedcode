@@ -20,9 +20,8 @@ export const WindowsACLBackend: ConfinementBackend = {
   },
   activate: (projectRoot: string, preApprovedPaths: string[]): boolean => {
     const canon = resolveWindowsPath(projectRoot)
-    log.info("Windows NTFS confinement activated", { projectRoot: canon, preApprovedPaths: preApprovedPaths.length })
-    active = true
-    return true
+    log.warn("Windows NTFS ACL: no native enforcement implemented — activate() returning false", { projectRoot: canon, preApprovedPaths: preApprovedPaths.length })
+    return false
   },
   deactivate: () => { active = false },
   wrapCommand: (command: string, projectRoot: string, preApprovedPaths: string[]): string => {
@@ -55,6 +54,6 @@ export const WindowsACLBackend: ConfinementBackend = {
   },
   isActive: () => active,
   getEnforcementLevel: (): "kernel" | "namespace" | "application" => {
-    return active ? "namespace" : "application"
+    return "application"
   },
 }
