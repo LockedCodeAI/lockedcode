@@ -33,16 +33,16 @@ export const MacOSSandboxBackend: ConfinementBackend = {
 
     currentPreApprovedPaths = preApprovedPaths
 
-    // Generate and write the sandbox profile
+    // Generate and write the sandbox profile for use by wrapCommand().
+    // sandbox-exec cannot be applied to the current running process —
+    // it only confines child processes spawned through wrapCommand().
     const profile = generateProfile(projectRoot, preApprovedPaths)
     const profilePath = path.join(os.tmpdir(), `lockedcode-sandbox-${Date.now()}.sbpl`)
     fs.writeFileSync(profilePath, profile, "utf-8")
     currentProfilePath = profilePath
 
-    log.info("macOS sandbox confinement activated", { projectRoot, preApprovedPaths: preApprovedPaths.length, profilePath })
-
-    active = true
-    return true
+    log.warn("macOS sandbox: profile written but cannot confine current process — activate() returning false", { projectRoot, profilePath })
+    return false
   },
   deactivate: () => {
     active = false
@@ -65,6 +65,6 @@ export const MacOSSandboxBackend: ConfinementBackend = {
   },
   isActive: () => active,
   getEnforcementLevel: (): "kernel" | "namespace" | "application" => {
-    return active ? "kernel" : "application"
+    return "application"
   },
 }

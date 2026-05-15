@@ -468,16 +468,41 @@ NOTE: At any point in time through this workflow you should feel free to ask the
             Effect.gen(function* () {
               const ctx = context(args, opts)
 
-              // Security scanning for MCP tools
+              // Security: policy evaluation, trust scoring, and audit for MCP tools
               const secOpt = Option.getOrUndefined(yield* Effect.serviceOption(Security.Service))
               if (secOpt) {
-                yield* secOpt.evaluatePolicy(key, {
+                const policy = yield* secOpt.evaluatePolicy(key, {
                   sessionID: ctx.sessionID,
                   messageID: input.processor.message.id,
                   agent: input.agent.name,
                 })
+                if (policy.action === "deny") {
+                  yield* secOpt.recordAuditEvent({
+                    eventType: "mcp_tool_blocked",
+                    sessionId: ctx.sessionID,
+                    timestamp: Date.now(),
+                    severity: "high",
+                    toolName: key,
+                    modelId: input.agent.name,
+                    actionTaken: "blocked",
+                    details: { source: "mcp", callId: opts.toolCallId, reason: policy.explanation },
+                  })
+                  return {
+                    title: `Security blocked MCP tool: ${key}`,
+                    metadata: {},
+                    output: `Blocked by security policy: ${policy.explanation}`,
+                    content: [{ type: "text" as const, text: `Blocked by security policy: ${policy.explanation}` }],
+                  }
+                }
+
+                yield* secOpt.scoreTrust(key, {
+                  sessionID: ctx.sessionID,
+                  agent: input.agent.name,
+                  source: "mcp",
+                })
+
                 yield* secOpt.recordAuditEvent({
-                  eventType: "security.scan_started",
+                  eventType: "mcp_tool_invoked",
                   sessionId: ctx.sessionID,
                   timestamp: Date.now(),
                   severity: "info",
@@ -512,9 +537,40 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                 result,
               )
 
+              // Security: scan MCP tool output content and record completion
               if (secOpt) {
+                const textContent = result.content
+                  .filter((c: { type: string }) => c.type === "text")
+                  .map((c: { type: string; text?: string }) => (c as { text: string }).text)
+                  .join("\n")
+                if (textContent.length > 0) {
+                  const scanResult = yield* secOpt.scanContent(textContent, {
+                    sessionID: ctx.sessionID,
+                    source: "mcp",
+                    toolName: key,
+                  })
+                  if (scanResult.action === "block") {
+                    yield* secOpt.recordAuditEvent({
+                      eventType: "mcp_output_blocked",
+                      sessionId: ctx.sessionID,
+                      timestamp: Date.now(),
+                      severity: scanResult.severity,
+                      toolName: key,
+                      modelId: input.agent.name,
+                      actionTaken: "blocked",
+                      details: { source: "mcp", callId: opts.toolCallId, findings: scanResult.findings.length },
+                    })
+                    return {
+                      title: `Security blocked MCP tool output: ${key}`,
+                      metadata: {},
+                      output: `MCP tool output blocked by security scanning: ${scanResult.remediation}`,
+                      content: [{ type: "text" as const, text: `MCP tool output blocked: ${scanResult.remediation}` }],
+                    }
+                  }
+                }
+
                 yield* secOpt.recordAuditEvent({
-                  eventType: "security.scan_completed",
+                  eventType: "mcp_tool_completed",
                   sessionId: ctx.sessionID,
                   timestamp: Date.now(),
                   severity: "info",

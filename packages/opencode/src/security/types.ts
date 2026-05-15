@@ -169,6 +169,10 @@ export type SecurityEventType =
   | "security.dlp_pii_detected"
   | "security.injection_detected"
   | "security.trust_threshold_crossed"
+  | "mcp_tool_invoked"
+  | "mcp_tool_blocked"
+  | "mcp_tool_completed"
+  | "mcp_output_blocked"
 
 /**
  * Structured data for a security audit event.
