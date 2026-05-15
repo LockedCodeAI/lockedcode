@@ -27,6 +27,10 @@ If you are unsure if a PR would be accepted, feel free to ask a maintainer or lo
 
 Want to take on an issue? Leave a comment and a maintainer may assign it to you unless it is something we are already working on.
 
+## Migration: Home Directory Files Moved to Project-Local
+
+As of the sandbox confinement remediation (see `SANDBOX-AUDIT.md`), LockedCode no longer reads templates from `~/.lockedcode/templates/`, custom rules from `~/.lockedcode/custom-rules/`, or policy from `~/.config/lockedcode/policy.json` by default. These files are now expected at project-local paths: `.lockedcode/templates/`, `.lockedcode/rules/`, and `.lockedcode/policy.json` respectively. If you have files at the old home-directory locations, copy them into your project's `.lockedcode/` directory. Global policy loading can be re-enabled with the `allowGlobalPolicy` option, but global templates and global rules are not yet wired.
+
 ## Security Contributions
 
 Security-related contributions are especially welcome:

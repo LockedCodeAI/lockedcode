@@ -4,6 +4,9 @@ import os from "os"
 import * as Log from "@opencode-ai/core/util/log"
 import { PolicyDocumentSchema } from "./schema"
 import type { Policy } from "./schema"
+import { checkPathSync } from "../confinement/whitelist"
+
+const log = Log.create({ service: "policy.loader" })
 
 export type { Policy }
 
@@ -71,11 +74,17 @@ function validatePolicy(raw: Record<string, unknown>, source: string): Policy {
 }
 
 /**
- * Deep merge two policy objects.
+ * Deep merge two policy objects with source tagging.
  * Arrays are replaced, not concatenated.
  * Nested objects are recursively merged.
+ * When sourceName is provided, merged keys are tagged in __source metadata.
+ *
+ * @param target - Base policy object
+ * @param source - Overriding policy object
+ * @param sourceName - Optional source name for tagging merged keys
+ * @returns Merged object with source tags if sourceName provided
  */
-function deepMerge(target: any, source: any): any {
+function deepMerge(target: any, source: any, sourceName?: string): any {
   if (source === undefined || source === null) return target
   if (target === undefined || target === null) return source
   if (typeof target !== "object" || typeof source !== "object") return source
@@ -83,10 +92,15 @@ function deepMerge(target: any, source: any): any {
 
   const result = { ...target }
   for (const key of Object.keys(source)) {
+    if (key === "__source") continue
     if (key in target) {
-      result[key] = deepMerge(target[key], source[key])
+      result[key] = deepMerge(target[key], source[key], sourceName)
     } else {
       result[key] = source[key]
+    }
+    if (sourceName && typeof result[key] !== "object") {
+      if (!result.__source) result.__source = {}
+      result.__source[key] = sourceName
     }
   }
   return result
@@ -95,23 +109,45 @@ function deepMerge(target: any, source: any): any {
 /**
  * Load and merge policy files with hierarchy:
  * 1. Global defaults (built-in)
- * 2. Global policy: ~/.config/lockedcode/policy.json (XDG)
- * 3. Project policy: projectRoot/lockedcode.json
- * 4. Session overrides (in-memory)
+ * 2. Project policy: projectRoot/lockedcode.json or .lockedcode/policy.json
+ * 3. Session overrides (in-memory)
  *
- * Returns the merged Policy.
+ * Global XDG policy (~/.config/lockedcode/policy.json) is NOT loaded by default.
+ * Set `options.allowGlobalPolicy` to true to enable XDG policy loading (functional
+ * but gated — loads, merges with source tagging, and logs a warning).
+ *
+ * @param projectRoot - Project root directory for project-local policy
+ * @param sessionOverrides - In-memory session overrides
+ * @param options - Optional configuration
+ * @param options.allowGlobalPolicy - If true, load and merge XDG global policy
+ * @returns Merged policy and list of source files used
  */
-export function loadPolicy(projectRoot?: string, sessionOverrides?: Record<string, unknown>): { policy: Policy; sources: string[] } {
+export function loadPolicy(
+  projectRoot?: string,
+  sessionOverrides?: Record<string, unknown>,
+  options?: { allowGlobalPolicy?: boolean },
+): { policy: Policy; sources: string[] } {
   let current: Record<string, unknown> = DEFAULT_POLICY as any
   const sources: string[] = ["built-in defaults"]
 
-  // Global XDG policy
-  const globalPath = path.join(xdgConfigDir(), "policy.json")
-  const globalRaw = loadPolicyFile(globalPath)
-  if (globalRaw) {
-    const validated = validatePolicy(globalRaw, globalPath)
-    current = deepMerge(current, validated)
-    sources.push(globalPath)
+  // Global XDG policy — only if explicitly opted in
+  if (options?.allowGlobalPolicy) {
+    const globalPath = path.join(xdgConfigDir(), "policy.json")
+    const confinement = checkPathSync(globalPath, "read", process.cwd())
+    if (confinement.allowed) {
+      const globalRaw = loadPolicyFile(globalPath)
+      if (globalRaw) {
+        log.warn("loading global XDG policy (flag-gated)", { path: globalPath })
+        const validated = validatePolicy(globalRaw, globalPath)
+        current = deepMerge(current, validated, globalPath)
+        sources.push(globalPath)
+      }
+    } else {
+      log.warn("global policy path denied by confinement — register via Confinement.registerExternalPath if needed", {
+        path: globalPath,
+        reason: confinement.reason,
+      })
+    }
   }
 
   // Project policy
@@ -121,10 +157,15 @@ export function loadPolicy(projectRoot?: string, sessionOverrides?: Record<strin
       path.join(projectRoot, ".lockedcode", "policy.json"),
     ]
     for (const pp of projectPaths) {
+      const confinement = checkPathSync(pp, "read", projectRoot)
+      if (!confinement.allowed) {
+        log.warn("confinement denied project policy read", { path: pp, reason: confinement.reason })
+        continue
+      }
       const projectRaw = loadPolicyFile(pp)
       if (projectRaw) {
         const validated = validatePolicy(projectRaw, pp)
-        current = deepMerge(current, validated)
+        current = deepMerge(current, validated, pp)
         sources.push(pp)
       }
     }
@@ -132,11 +173,23 @@ export function loadPolicy(projectRoot?: string, sessionOverrides?: Record<strin
 
   // Session overrides
   if (sessionOverrides) {
-    current = deepMerge(current, sessionOverrides)
+    current = deepMerge(current, sessionOverrides, "session override")
     sources.push("session override")
   }
 
-  // Final validation
-  const finalPolicy = validatePolicy(current, sources.join(", "))
+  // Final validation (strip __source tags before validation)
+  const cleaned = stripSourceTags(JSON.parse(JSON.stringify(current)))
+  const finalPolicy = validatePolicy(cleaned, sources.join(", "))
   return { policy: finalPolicy, sources }
+}
+
+/** Strip __source metadata tags before schema validation. */
+function stripSourceTags(obj: any): any {
+  if (typeof obj !== "object" || obj === null || Array.isArray(obj)) return obj
+  const result: any = {}
+  for (const key of Object.keys(obj)) {
+    if (key === "__source") continue
+    result[key] = stripSourceTags(obj[key])
+  }
+  return result
 }

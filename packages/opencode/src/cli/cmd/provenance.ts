@@ -1,6 +1,11 @@
 import type { CommandModule } from "yargs"
 import path from "path"
 import fs from "fs"
+import os from "os"
+import * as Log from "@opencode-ai/core/util/log"
+import { checkPathSync } from "../../security/confinement/whitelist"
+
+const log = Log.create({ service: "cli.provenance" })
 
 type Args = { file?: string; model?: string; review?: string }
 
@@ -30,10 +35,16 @@ export const ProvenanceCommand = {
     console.log("  lockedcode provenance src/security/index.ts")
 
     if (args.model) {
-      const dataDir = path.join(require("os").homedir(), ".local", "share", "lockedcode")
+      const dataDir = path.join(os.homedir(), ".local", "share", "lockedcode")
       const dbPath = path.join(dataDir, "lockedcode-local.db")
+      const confinement = checkPathSync(dbPath, "read", process.cwd())
+      if (!confinement.allowed) {
+        log.error("confinement denied CLI database access", { path: dbPath, reason: confinement.reason })
+        console.log(`Access denied: ${confinement.reason}`)
+        return
+      }
+      log.debug("CLI database access", { subcommand: "provenance", path: dbPath })
       if (fs.existsSync(dbPath)) {
-        // Simple SQLite query via bun shell
         const { $ } = await import("bun")
         const result = await $`sqlite3 ${dbPath} "SELECT file_path, operation, timestamp FROM file_provenance WHERE model_id = '${args.model}' ORDER BY timestamp DESC LIMIT 50"`.text()
         console.log(result)

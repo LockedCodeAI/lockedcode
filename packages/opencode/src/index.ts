@@ -38,7 +38,9 @@ import { DbCommand } from "./cli/cmd/db"
 import { SecurityCheckCommand } from "./cli/cmd/security-check"
 import { RulesListCommand, RulesTestCommand } from "./cli/cmd/rules"
 import { ProvenanceCommand } from "./cli/cmd/provenance"
+import { registerExternalPath } from "./security/confinement/whitelist"
 import path from "path"
+import os from "os"
 import { Global } from "@opencode-ai/core/global"
 import { JsonMigration } from "@/storage/json-migration"
 import { Database } from "@/storage/db"
@@ -49,6 +51,11 @@ import { drizzle } from "drizzle-orm/bun-sqlite"
 import { ensureProcessMetadata } from "@opencode-ai/core/util/opencode-process"
 
 const processMetadata = ensureProcessMetadata("main")
+
+registerExternalPath(
+  path.join(os.homedir(), ".local", "share", "lockedcode"),
+  "shared CLI state database — auditable via lockedcode audit list",
+)
 
 process.on("unhandledRejection", (e) => {
   Log.Default.error("rejection", {
