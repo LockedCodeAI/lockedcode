@@ -39,6 +39,7 @@ import type {
   RunResource,
 } from "./types"
 import { RUN_THEME_FALLBACK, type RunTheme } from "./theme"
+import { InstallationVersion } from "@opencode-ai/core/installation/version"
 
 const EMPTY_BORDER = {
   topLeft: "",
@@ -639,6 +640,9 @@ export function RunFooterView(props: RunFooterViewProps) {
                           {usage()}
                         </text>
                       </Show>
+                      <text id="run-direct-footer-version" fg={theme().muted} wrapMode="none" truncate>
+                        v{InstallationVersion}
+                      </text>
                       <Show when={command().length > 0 && hints().command}>
                         <text id="run-direct-footer-hint-command" fg={theme().text} wrapMode="none" truncate>
                           {command()} <span style={{ fg: theme().muted }}>commands</span>
