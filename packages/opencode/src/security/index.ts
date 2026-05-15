@@ -27,7 +27,7 @@ export interface Interface {
   readonly getStrictness: () => SecurityConfig["strictness"]
   readonly scanContent: (content: string, metadata: Record<string, unknown>) => Effect.Effect<ScanResult>
   readonly scanCommand: (command: string, metadata: Record<string, unknown>) => Effect.Effect<ScanResult>
-  readonly checkConfinement: (path: string, operation: "read" | "write" | "execute") => Effect.Effect<ConfinementResult>
+  readonly checkConfinement: (path: string, operation: "read" | "write" | "execute", sessionId?: string) => Effect.Effect<ConfinementResult>
   readonly scanOutbound: (content: string, metadata: Record<string, unknown>) => Effect.Effect<DLPResult>
   readonly evaluatePolicy: (action: string, context: Record<string, unknown>) => Effect.Effect<PolicyDecision>
   readonly scoreTrust: (action: string, context: Record<string, unknown>) => Effect.Effect<TrustScore>
@@ -141,9 +141,10 @@ export const layer = Layer.effect(
     const checkConfinement = Effect.fn("Security.checkConfinement")(function* (
       path: string,
       operation: "read" | "write" | "execute",
+      sessionId?: string,
     ) {
-      log.debug("checkConfinement called", { path, operation })
-      return yield* confinement.checkPath(path, operation)
+      log.debug("checkConfinement called", { path, operation, sessionId })
+      return yield* confinement.checkPath(path, operation, sessionId)
     })
 
     const scanOutbound = Effect.fn("Security.scanOutbound")(function* (
@@ -293,9 +294,10 @@ export const busLayer = Layer.effect(
     const checkConfinement = Effect.fn("Security.checkConfinement")(function* (
       path: string,
       operation: "read" | "write" | "execute",
+      sessionId?: string,
     ) {
-      log.debug("checkConfinement called", { path, operation })
-      return yield* confinement.checkPath(path, operation)
+      log.debug("checkConfinement called", { path, operation, sessionId })
+      return yield* confinement.checkPath(path, operation, sessionId)
     })
 
     // scanOutbound in busLayer

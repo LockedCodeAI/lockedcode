@@ -8,6 +8,7 @@ import { Service as AuditService, defaultLayer as auditLayer } from "../audit"
 import { Service as PolicyService, defaultLayer as policyLayer } from "../policy"
 import { Service as TrustService, defaultLayer as trustLayer } from "../trust"
 import { Service as SecurityConfigService, defaultLayer as configLayer } from "../config"
+import { Service as ConfinementService, defaultLayer as confinementLayer } from "../confinement"
 import { defaultSecurityConfig, type SecurityConfig } from "../types"
 
 // Test layers for subsystem-only tests (no Bus dependency)
@@ -245,6 +246,45 @@ describe("Scanning strictness-aware zero-scanner behavior", () => {
       const svc = yield* ScanningService
       const result = yield* svc.scan("safe code", { operation: "write" })
       expect(result.action).toBe("pass")
+    }),
+  )
+})
+
+// ============================================================
+// Session-isolated confinement (#5)
+// ============================================================
+
+describe("Session-isolated confinement approvals", () => {
+  const confinementTest = testEffect(Layer.mergeAll(confinementLayer, configLayer))
+
+  confinementTest.effect("session A's approval does not grant access to session B", () =>
+    Effect.gen(function* () {
+      const svc = yield* ConfinementService
+      yield* svc.approvePathForSession("session-A", "/etc/special")
+      const resultA = yield* svc.checkPath("/etc/special", "read", "session-A")
+      expect(resultA.allowed).toBe(true)
+      const resultB = yield* svc.checkPath("/etc/special", "read", "session-B")
+      expect(resultB.allowed).toBe(false)
+    }),
+  )
+
+  confinementTest.effect("checkPath without sessionId skips session approvals", () =>
+    Effect.gen(function* () {
+      const svc = yield* ConfinementService
+      yield* svc.approvePathForSession("session-C", "/etc/special-c")
+      const result = yield* svc.checkPath("/etc/special-c", "read")
+      expect(result.allowed).toBe(false)
+    }),
+  )
+
+  confinementTest.effect("approvePathForSession grants all operations for that session", () =>
+    Effect.gen(function* () {
+      const svc = yield* ConfinementService
+      yield* svc.approvePathForSession("session-D", "/tmp/test-path")
+      const readResult = yield* svc.checkPath("/tmp/test-path", "read", "session-D")
+      const writeResult = yield* svc.checkPath("/tmp/test-path", "write", "session-D")
+      expect(readResult.allowed).toBe(true)
+      expect(writeResult.allowed).toBe(true)
     }),
   )
 })

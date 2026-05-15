@@ -390,7 +390,7 @@ export const layer: Layer.Layer<
 
               // Step 1.5: Confinement check for file-read tools (prevents exfiltration to LLM)
               if ((tool.id === "read" || tool.id === "glob" || tool.id === "grep") && filePath) {
-                const confinement = yield* security.checkConfinement(filePath, "read")
+                const confinement = yield* security.checkConfinement(filePath, "read", ctx.sessionID)
                 if (!confinement.allowed) {
                   yield* security.recordAuditEvent({
                     eventType: "file_write_blocked",
@@ -418,7 +418,7 @@ export const layer: Layer.Layer<
 
               // Step 1.6: Confinement check for file-write tools
               if ((tool.id === "write" || tool.id === "edit" || tool.id === "patch") && filePath) {
-                const confinement = yield* security.checkConfinement(filePath, "write")
+                const confinement = yield* security.checkConfinement(filePath, "write", ctx.sessionID)
                 if (!confinement.allowed) {
                   yield* security.recordAuditEvent({
                     eventType: "file_write_blocked",
@@ -448,7 +448,7 @@ export const layer: Layer.Layer<
               if (tool.id === "read" || tool.id === "glob" || tool.id === "grep") {
                 const readPath = filePath || String(argsObj.path ?? "")
                 if (readPath) {
-                  const confinement = yield* security.checkConfinement(readPath, "read")
+                  const confinement = yield* security.checkConfinement(readPath, "read", ctx.sessionID)
                   if (!confinement.allowed) {
                     yield* security.recordAuditEvent({
                       eventType: "file_read_blocked",

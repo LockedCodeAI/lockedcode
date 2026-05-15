@@ -28,7 +28,7 @@ const pendingEscapes = new Map<string, MutableEscape>()
 const sessionApprovals = new Map<string, Set<string>>()
 
 export interface Interface {
-  readonly checkPath: (path: string, operation: "read" | "write" | "execute") => Effect.Effect<ConfinementResult>
+  readonly checkPath: (path: string, operation: "read" | "write" | "execute", sessionId?: string) => Effect.Effect<ConfinementResult>
   readonly requestEscape: (path: string, operation: string, reason: string) => Effect.Effect<EscapeRequest>
   readonly approveEscape: (escapeId: string) => Effect.Effect<ConfinementResult>
   readonly denyEscape: (escapeId: string, reason?: string) => Effect.Effect<ConfinementResult>
@@ -61,6 +61,7 @@ export const layer = Layer.effect(
     const checkPath = Effect.fn("Confinement.checkPath")(function* (
       path: string,
       operation: "read" | "write" | "execute",
+      sessionId?: string,
     ) {
       if (!enabled) {
         return { allowed: true, path, operation, reason: "confinement disabled", escapable: false } as ConfinementResult
@@ -71,11 +72,14 @@ export const layer = Layer.effect(
         return { allowed: false, path, operation, reason: "path contains null bytes or is invalid", escapable: false } as ConfinementResult
       }
 
-      // Check session-level approved paths first
-      const sessionKey = `${operation}:${canon}`
-      for (const [, approved] of sessionApprovals) {
-        if (approved.has(sessionKey) || approved.has(canon)) {
-          return { allowed: true, path: canon, operation, reason: "session-approved escape path", escapable: false } as ConfinementResult
+      // Check session-level approved paths — only for the caller's session
+      if (sessionId) {
+        const approved = sessionApprovals.get(sessionId)
+        if (approved) {
+          const sessionKey = `${operation}:${canon}`
+          if (approved.has(sessionKey) || approved.has(canon)) {
+            return { allowed: true, path: canon, operation, reason: "session-approved escape path", escapable: false } as ConfinementResult
+          }
         }
       }
 

@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test"
 import { detectPlatform, detectLinuxCapabilities, getBestBackend } from "../confinement/platform"
 import { BubblewrapBackend } from "../confinement/backends/bubblewrap"
 import { LandlockBackend } from "../confinement/backends/landlock"
+import { MacOSSandboxBackend } from "../confinement/backends/macos-sandbox"
+import { WindowsACLBackend } from "../confinement/backends/windows-acl"
 
 // ============================================================
 // Platform Detection Tests
@@ -109,5 +111,63 @@ describe("Landlock backend", () => {
   test("wrapCommand delegates to Bubblewrap", () => {
     const cmd = LandlockBackend.wrapCommand("echo hi", "/project", ["/tmp"])
     expect(cmd).toContain("bwrap")
+  })
+})
+
+// ============================================================
+// macOS Sandbox Backend Honesty Tests (#10)
+// ============================================================
+
+describe("macOS Sandbox backend", () => {
+  test("has platform macos", () => {
+    expect(MacOSSandboxBackend.platform).toBe("macos")
+  })
+
+  test("activate returns false (cannot confine current process)", () => {
+    const result = MacOSSandboxBackend.activate("/project", ["/tmp"])
+    expect(result).toBe(false)
+  })
+
+  test("getEnforcementLevel never returns kernel", () => {
+    expect(MacOSSandboxBackend.getEnforcementLevel()).toBe("application")
+  })
+
+  test("isActive returns false after activate", () => {
+    MacOSSandboxBackend.activate("/project", [])
+    expect(MacOSSandboxBackend.isActive()).toBe(false)
+  })
+
+  test("wrapCommand produces sandbox-exec invocation when available", () => {
+    const cmd = MacOSSandboxBackend.wrapCommand("echo hi", "/project", ["/tmp"])
+    expect(cmd).toContain("sandbox-exec")
+    expect(cmd).toContain("echo hi")
+  })
+})
+
+// ============================================================
+// Windows ACL Backend Honesty Tests (#10)
+// ============================================================
+
+describe("Windows ACL backend", () => {
+  test("has platform windows", () => {
+    expect(WindowsACLBackend.platform).toBe("windows")
+  })
+
+  test("activate returns false (no native enforcement)", () => {
+    const result = WindowsACLBackend.activate("/project", ["/tmp"])
+    expect(result).toBe(false)
+  })
+
+  test("getEnforcementLevel returns application", () => {
+    expect(WindowsACLBackend.getEnforcementLevel()).toBe("application")
+  })
+
+  test("isActive returns false", () => {
+    expect(WindowsACLBackend.isActive()).toBe(false)
+  })
+
+  test("wrapCommand produces powershell invocation", () => {
+    const cmd = WindowsACLBackend.wrapCommand("dir", "C:\\project", [])
+    expect(cmd).toContain("powershell")
   })
 })
