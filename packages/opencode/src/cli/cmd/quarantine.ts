@@ -3,6 +3,10 @@ import path from "path"
 import fs from "fs"
 import os from "os"
 import { execFileSync } from "child_process"
+import * as Log from "@opencode-ai/core/util/log"
+import { checkPathSync } from "../../security/confinement/whitelist"
+
+const log = Log.create({ service: "cli.quarantine" })
 
 type ListArgs = { status?: string; severity?: string }
 type ShowArgs = { id: string }
@@ -11,8 +15,18 @@ type DiscardArgs = { id: string }
 
 const DB_PATH = path.join(os.homedir(), ".local", "share", "lockedcode", "lockedcode-local.db")
 
+function assertDbAccess(): void {
+  const result = checkPathSync(DB_PATH, "read", process.cwd())
+  if (!result.allowed) {
+    log.error("confinement denied CLI database access", { path: DB_PATH, reason: result.reason })
+    throw new Error(`Confinement: access denied to ${DB_PATH} — ${result.reason}`)
+  }
+  log.debug("CLI database access", { subcommand: "quarantine", path: DB_PATH })
+}
+
 function query(sql: string): any[] {
   try {
+    assertDbAccess()
     if (!fs.existsSync(DB_PATH)) return []
     const result = execFileSync("sqlite3", ["-json", DB_PATH, sql], { encoding: "utf-8", maxBuffer: 1024 * 1024 })
     return JSON.parse(result || "[]")
@@ -21,6 +35,7 @@ function query(sql: string): any[] {
 
 function run(sql: string): void {
   try {
+    assertDbAccess()
     if (!fs.existsSync(DB_PATH)) return
     execFileSync("sqlite3", [DB_PATH, sql], { encoding: "utf-8" })
   } catch {}
