@@ -194,7 +194,7 @@ export interface SecurityConfig {
   readonly scanning: ScanningConfig
   readonly dlp: DLPConfig
   readonly injection: InjectionConfig
-  readonly audit: { readonly enabled: boolean }
+  readonly audit: { readonly enabled: boolean; readonly retentionDays: number }
 }
 
 /** Injection detection configuration. */
@@ -265,5 +265,5 @@ export const defaultSecurityConfig: SecurityConfig = {
     enabled: true,
     sensitivity: "medium",
   },
-  audit: { enabled: true },
+  audit: { enabled: true, retentionDays: 90 },
 }

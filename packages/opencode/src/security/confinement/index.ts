@@ -32,7 +32,7 @@ export interface Interface {
   readonly requestEscape: (path: string, operation: string, reason: string) => Effect.Effect<EscapeRequest>
   readonly approveEscape: (escapeId: string) => Effect.Effect<ConfinementResult>
   readonly denyEscape: (escapeId: string, reason?: string) => Effect.Effect<ConfinementResult>
-  readonly approvePathForSession: (path: string) => Effect.Effect<void>
+  readonly approvePathForSession: (sessionId: string, path: string) => Effect.Effect<void>
   readonly detectBackend: () => Effect.Effect<string>
   readonly getProjectRoot: () => Effect.Effect<string>
 }
@@ -194,11 +194,17 @@ export const layer = Layer.effect(
       } as ConfinementResult
     })
 
-    const approvePathForSession = Effect.fn("Confinement.approvePathForSession")(function* (path: string) {
-      if (!sessionApprovals.has(path)) {
-        sessionApprovals.set(path, new Set())
+    const approvePathForSession = Effect.fn("Confinement.approvePathForSession")(function* (sessionId: string, path: string) {
+      if (!sessionApprovals.has(sessionId)) {
+        sessionApprovals.set(sessionId, new Set())
       }
-      sessionApprovals.get(path)!.add(path)
+      const canon = canonicalize(path, cwd)
+      if (canon) {
+        sessionApprovals.get(sessionId)!.add(canon)
+        sessionApprovals.get(sessionId)!.add(`read:${canon}`)
+        sessionApprovals.get(sessionId)!.add(`write:${canon}`)
+        sessionApprovals.get(sessionId)!.add(`execute:${canon}`)
+      }
     })
 
     const detectBackend = Effect.fn("Confinement.detectBackend")(function* () {
