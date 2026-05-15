@@ -7,6 +7,7 @@ import { Client } from "@/storage/db"
 import { QuarantineTable } from "./schema"
 import { captureFileState, rollbackFile, createDiff } from "./rollback"
 import { hashContent } from "../audit/hash"
+import { checkPathSync } from "../confinement/whitelist"
 import type { Severity } from "../types"
 
 const log = Log.create({ service: "quarantine" })
@@ -136,7 +137,11 @@ export const layer = Layer.effect(
         return
       }
 
-      // Write the quarantined content back to the file
+      const writeCheck = checkPathSync(row.file_path, "write", process.cwd())
+      if (!writeCheck.allowed) {
+        log.error("confinement denied quarantine restore write", { filePath: row.file_path, reason: writeCheck.reason })
+        return
+      }
       fs.writeFileSync(row.file_path, row.quarantined_content, "utf-8")
 
       yield* Effect.sync(() =>

@@ -1,5 +1,6 @@
 import fs from "fs"
 import { CustomRuleFileSchema, type CustomRule } from "./schema"
+import { checkPathSync } from "../confinement/whitelist"
 
 export interface RuleTestCaseResult {
   readonly ruleId: string
@@ -81,6 +82,11 @@ export function testRuleFile(filepath: string): RuleFileTestResult {
   try {
     if (!fs.existsSync(filepath)) {
       return { filepath, valid: false, rules: [], totalPassed: 0, totalFailed: 0, error: "File not found" }
+    }
+
+    const readCheck = checkPathSync(filepath, "read", process.cwd())
+    if (!readCheck.allowed) {
+      return { filepath, valid: false, rules: [], totalPassed: 0, totalFailed: 0, error: `Confinement denied: ${readCheck.reason}` }
     }
 
     const content = fs.readFileSync(filepath, "utf-8")

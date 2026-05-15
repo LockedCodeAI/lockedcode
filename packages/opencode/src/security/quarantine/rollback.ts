@@ -1,4 +1,5 @@
 import fs from "fs"
+import { checkPathSync } from "../confinement/whitelist"
 
 /**
  * Capture the current state of a file before modification.
@@ -6,6 +7,8 @@ import fs from "fs"
  */
 export function captureFileState(filePath: string): { exists: boolean; content: string | null } {
   try {
+    const check = checkPathSync(filePath, "read", process.cwd())
+    if (!check.allowed) return { exists: false, content: null }
     if (fs.existsSync(filePath)) {
       return { exists: true, content: fs.readFileSync(filePath, "utf-8") }
     }
@@ -19,6 +22,10 @@ export function captureFileState(filePath: string): { exists: boolean; content: 
  * If originalContent is provided, restores it.
  */
 export function rollbackFile(filePath: string, originalContent: string | null): void {
+  const check = checkPathSync(filePath, "write", process.cwd())
+  if (!check.allowed) {
+    throw new Error(`Confinement: cannot write to ${filePath} — ${check.reason}`)
+  }
   if (originalContent !== null) {
     fs.writeFileSync(filePath, originalContent, "utf-8")
   } else if (fs.existsSync(filePath)) {

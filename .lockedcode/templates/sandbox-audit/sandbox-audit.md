@@ -136,7 +136,7 @@ Run these searches across the entire `packages/opencode/src/` tree (excluding `_
 ```
 grep -rn "os\.homedir()" packages/opencode/src/ --include="*.ts" --include="*.tsx" | grep -v __tests__ | grep -v "\.test\."
 ```
-**Expected known hits:** index.ts, models.ts, siem.ts, quarantine.ts, provenance.ts, policy/loader.ts, confinement/whitelist.ts, confinement/index.ts, confinement/root.ts, confinement/paths.ts, confinement/backends/*, config/variable.ts, file/protected.ts, permission/index.ts, session/prompt.ts, tool/shell.ts, lsp/server.ts, editor-zed.ts, editor.ts, compliance/generator.ts, session/list.ts, session/timeline.ts, cli/cmd/uninstall.ts, cli/cmd/providers.ts, rules/resolver.ts
+**Expected known hits:** index.ts, models.ts, siem.ts, quarantine.ts, provenance.ts, policy/loader.ts, confinement/whitelist.ts, confinement/index.ts, confinement/root.ts, confinement/paths.ts, confinement/backends/*, config/variable.ts, file/protected.ts, permission/index.ts, session/prompt.ts, tool/shell.ts, lsp/server.ts, editor-zed.ts, editor.ts, compliance/generator.ts, session/list.ts, session/timeline.ts, cli/cmd/uninstall.ts, cli/cmd/providers.ts, rules/resolver.ts, cli/cmd/run/tool.ts
 
 Any hit NOT in this list is a **NEW FINDING**.
 

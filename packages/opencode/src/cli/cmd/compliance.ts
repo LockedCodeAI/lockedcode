@@ -1,7 +1,9 @@
 import type { CommandModule } from "yargs"
 import fs from "fs"
+import path from "path"
 import { generateReport } from "../../security/compliance/generator"
 import { formatMarkdown, formatJSON } from "../../security/compliance/markdown"
+import { checkPathSync } from "../../security/confinement/whitelist"
 
 type Args = { framework?: string; since?: string; until?: string; output?: string; format?: string }
 
@@ -41,6 +43,12 @@ export const ComplianceReportCommand = {
     const result = fmt === "json" ? formatJSON(report) : formatMarkdown(report)
 
     if (output) {
+      const resolved = path.resolve(output)
+      const writeCheck = checkPathSync(resolved, "write", process.cwd())
+      if (!writeCheck.allowed) {
+        console.error(`Confinement: cannot write to ${resolved} — ${writeCheck.reason}`)
+        process.exit(1)
+      }
       fs.writeFileSync(output, result, "utf-8")
       console.log(`Compliance report written to ${output}`)
     } else {

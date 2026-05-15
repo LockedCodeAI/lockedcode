@@ -8,6 +8,10 @@ import { checkPathSync } from "../../security/confinement/whitelist"
 
 const log = Log.create({ service: "cli.quarantine" })
 
+function escapeSql(value: string): string {
+  return value.replace(/'/g, "''")
+}
+
 type ListArgs = { status?: string; severity?: string }
 type ShowArgs = { id: string }
 type RestoreArgs = { id: string }
@@ -58,8 +62,8 @@ export const QuarantineListCommand = {
 
     let sql = "SELECT * FROM quarantine_record"
     const clauses: string[] = []
-    if (status) clauses.push(`status = '${status}'`)
-    if (severity) clauses.push(`severity = '${severity}'`)
+    if (status) clauses.push(`status = '${escapeSql(status)}'`)
+    if (severity) clauses.push(`severity = '${escapeSql(severity)}'`)
     if (clauses.length > 0) sql += ` WHERE ${clauses.join(" AND ")}`
     sql += " ORDER BY quarantined_at DESC LIMIT 50"
 
@@ -101,7 +105,7 @@ export const QuarantineShowCommand = {
   builder: (yargs: any) => yargs.positional("id", { describe: "Quarantine record ID", type: "string" }),
   handler: async (args: any) => {
     const id = args.id as string
-    const rows = query(`SELECT * FROM quarantine_record WHERE id = '${id}'`)
+    const rows = query(`SELECT * FROM quarantine_record WHERE id = '${escapeSql(id)}'`)
 
     if (rows.length === 0) {
       console.log(`\nQuarantine record "${id}" not found.\n`)
@@ -143,7 +147,8 @@ export const QuarantineRestoreCommand = {
   builder: (yargs: any) => yargs.positional("id", { describe: "Quarantine record ID", type: "string" }),
   handler: async (args: any) => {
     const id = args.id as string
-    const rows = query(`SELECT * FROM quarantine_record WHERE id = '${id}'`)
+    const safeId = escapeSql(id)
+    const rows = query(`SELECT * FROM quarantine_record WHERE id = '${safeId}'`)
 
     if (rows.length === 0) {
       console.log(`\nQuarantine record "${id}" not found.\n`)
@@ -151,8 +156,13 @@ export const QuarantineRestoreCommand = {
     }
 
     const r = rows[0]
+    const writeCheck = checkPathSync(r.file_path, "write", process.cwd())
+    if (!writeCheck.allowed) {
+      console.error(`Confinement: cannot write to ${r.file_path} — ${writeCheck.reason}`)
+      process.exit(1)
+    }
     fs.writeFileSync(r.file_path, r.quarantined_content, "utf-8")
-    run(`UPDATE quarantine_record SET status = 'restored', resolved_at = ${Date.now()}, resolved_by = 'user' WHERE id = '${id}'`)
+    run(`UPDATE quarantine_record SET status = 'restored', resolved_at = ${Date.now()}, resolved_by = 'user' WHERE id = '${safeId}'`)
 
     console.log(`\n✓ Restored ${id}: ${r.file_path} (quarantined content written back)\n`)
   },
@@ -164,7 +174,7 @@ export const QuarantineDiscardCommand = {
   builder: (yargs: any) => yargs.positional("id", { describe: "Quarantine record ID", type: "string" }),
   handler: async (args: any) => {
     const id = args.id as string
-    run(`UPDATE quarantine_record SET status = 'discarded', resolved_at = ${Date.now()}, resolved_by = 'user' WHERE id = '${id}'`)
+    run(`UPDATE quarantine_record SET status = 'discarded', resolved_at = ${Date.now()}, resolved_by = 'user' WHERE id = '${escapeSql(id)}'`)
 
     console.log(`\n✗ Discarded ${id} (quarantined content retained in database for audit)\n`)
   },

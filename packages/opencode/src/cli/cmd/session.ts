@@ -1,8 +1,10 @@
 import type { CommandModule } from "yargs"
 import fs from "fs"
+import path from "path"
 import { buildTimeline } from "../../security/session/timeline"
 import { formatTimeline, formatTimelineJSON } from "../../security/session/formatter"
 import { listSessions } from "../../security/session/list"
+import { checkPathSync } from "../../security/confinement/whitelist"
 
 type ListArgs = { limit?: number; since?: string }
 type ReplayArgs = { sessionId: string }
@@ -87,6 +89,12 @@ export const SessionExportCommand = {
     const json = formatTimelineJSON(timeline)
 
     if (output) {
+      const resolved = path.resolve(output)
+      const writeCheck = checkPathSync(resolved, "write", process.cwd())
+      if (!writeCheck.allowed) {
+        console.error(`Confinement: cannot write to ${resolved} — ${writeCheck.reason}`)
+        process.exit(1)
+      }
       fs.writeFileSync(output, json, "utf-8")
       console.log(`Session exported to ${output}`)
     } else {

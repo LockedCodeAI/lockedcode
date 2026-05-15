@@ -30,13 +30,20 @@ export interface SessionTimeline {
   }
 }
 
+function escapeSql(value: string): string {
+  return value.replace(/'/g, "''")
+}
+
 function query(sql: string): any[] {
   try {
     const os = require("os")
     const path = require("path")
     const fs = require("fs")
     const { execFileSync } = require("child_process")
+    const { checkPathSync } = require("../confinement/whitelist")
     const dbPath = path.join(os.homedir(), ".local", "share", "lockedcode", "lockedcode-local.db")
+    const check = checkPathSync(dbPath, "read", process.cwd())
+    if (!check.allowed) return []
     if (!fs.existsSync(dbPath)) return []
     const result = execFileSync("sqlite3", ["-json", dbPath, sql], { encoding: "utf-8", maxBuffer: 1024 * 1024 })
     return JSON.parse(result || "[]")
@@ -44,8 +51,9 @@ function query(sql: string): any[] {
 }
 
 export function buildTimeline(sessionId: string): SessionTimeline {
+  const safeSessionId = escapeSql(sessionId)
   const events = query(
-    `SELECT * FROM security_event WHERE session_id = '${sessionId}' ORDER BY timestamp ASC`
+    `SELECT * FROM security_event WHERE session_id = '${safeSessionId}' ORDER BY timestamp ASC`
   )
 
   if (events.length === 0) {
@@ -66,7 +74,7 @@ export function buildTimeline(sessionId: string): SessionTimeline {
   for (let i = 0; i < events.length; i++) {
     const e = events[i]
     const prev = i > 0 ? events[i - 1] : null
-    const findings = query(`SELECT * FROM scan_result WHERE security_event_id = '${e.id}'`)
+    const findings = query(`SELECT * FROM scan_result WHERE security_event_id = '${escapeSql(e.id)}'`)
 
     entries.push({
       timestamp: e.timestamp,

@@ -42,9 +42,6 @@ function buildBwrapArgs(projectRoot: string, preApprovedPaths: string[]): string
   args.push("--unshare-all")
   args.push("--die-with-parent")
 
-  // Seccomp filter
-  args.push("--seccomp", "10")
-
   return args
 }
 
