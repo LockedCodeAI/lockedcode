@@ -152,6 +152,7 @@ export type SecurityEventType =
   | "security.action_blocked"
   | "security.action_approved"
   | "policy_blocked"
+  | "file_read_blocked"
   | "file_write_scanned"
   | "file_write_blocked"
   | "file_write_warned"

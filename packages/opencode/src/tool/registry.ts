@@ -444,6 +444,37 @@ export const layer: Layer.Layer<
                 }
               }
 
+              // Step 1.6: Confinement check for file-read tools
+              if (tool.id === "read" || tool.id === "glob" || tool.id === "grep") {
+                const readPath = filePath || String(argsObj.path ?? "")
+                if (readPath) {
+                  const confinement = yield* security.checkConfinement(readPath, "read")
+                  if (!confinement.allowed) {
+                    yield* security.recordAuditEvent({
+                      eventType: "file_read_blocked",
+                      sessionId: ctx.sessionID,
+                      timestamp: now,
+                      severity: "high",
+                      toolName: tool.id,
+                      modelId: ctx.agent,
+                      contentHash: contentForHash,
+                      actionTaken: "blocked",
+                      details: buildDetails({
+                        status: "blocked",
+                        block_reason: `Confinement: ${confinement.reason}`,
+                        path: confinement.path,
+                        escapable: confinement.escapable,
+                      }),
+                    })
+                    return {
+                      title: `⛔ SECURITY BLOCKED (Confinement): read path outside project root`,
+                      output: `Blocked by directory confinement: ${confinement.reason}\nPath: ${confinement.path}`,
+                      metadata: {},
+                    } as Tool.ExecuteResult
+                  }
+                }
+              }
+
               // Step 2: Scan content for write/edit/patch tools
               if (tool.id === "write" || tool.id === "edit" || tool.id === "patch") {
                 const scanResult = yield* security.scanContent(rawContent, { securityEventId: eventId, sessionID: ctx.sessionID, toolCallID: ctx.callID })

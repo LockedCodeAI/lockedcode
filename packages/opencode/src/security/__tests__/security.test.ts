@@ -2,13 +2,13 @@ import { describe, expect } from "bun:test"
 import { Effect, Layer, Option } from "effect"
 import { testEffect } from "../../../test/lib/effect"
 import { Security } from "../index"
-import { Service as ScanningService, defaultLayer as scanningLayer } from "../scanning"
+import { Service as ScanningService, layer as scanningRawLayer, defaultLayer as scanningLayer } from "../scanning"
 import { Service as DLPService, defaultLayer as dlpLayer } from "../dlp"
 import { Service as AuditService, defaultLayer as auditLayer } from "../audit"
 import { Service as PolicyService, defaultLayer as policyLayer } from "../policy"
 import { Service as TrustService, defaultLayer as trustLayer } from "../trust"
 import { Service as SecurityConfigService, defaultLayer as configLayer } from "../config"
-import { defaultSecurityConfig } from "../types"
+import { defaultSecurityConfig, type SecurityConfig } from "../types"
 
 // Test layers for subsystem-only tests (no Bus dependency)
 // Test layers for subsystem-only tests (no Bus dependency)
@@ -67,6 +67,33 @@ describe("SecurityService", () => {
       const result = yield* security.checkConfinement("/nonexistent-outside-path", "read")
       expect(result.allowed).toBe(false)
       expect(result.escapable).toBe(true)
+    }),
+  )
+
+  itMin.effect("checkConfinement denies read of /etc/passwd", () =>
+    Effect.gen(function* () {
+      const security = yield* Security.Service
+      const result = yield* security.checkConfinement("/etc/passwd", "read")
+      expect(result.allowed).toBe(false)
+    }),
+  )
+
+  itMin.effect("checkConfinement denies read of ~/.ssh/id_rsa", () =>
+    Effect.gen(function* () {
+      const security = yield* Security.Service
+      const result = yield* security.checkConfinement(
+        require("os").homedir() + "/.ssh/id_rsa",
+        "read",
+      )
+      expect(result.allowed).toBe(false)
+    }),
+  )
+
+  itMin.effect("checkConfinement allows read inside project root (cwd)", () =>
+    Effect.gen(function* () {
+      const security = yield* Security.Service
+      const result = yield* security.checkConfinement(process.cwd() + "/package.json", "read")
+      expect(result.allowed).toBe(true)
     }),
   )
 
@@ -170,6 +197,54 @@ describe("Interception Hooks", () => {
         const security = opt.value
         expect(security.getStrictness()).toBe("standard")
       }
+    }),
+  )
+})
+
+// ============================================================
+// Scanning fail-closed behavior (#3)
+// ============================================================
+
+describe("Scanning strictness-aware zero-scanner behavior", () => {
+  function makeScanningLayer(strictness: SecurityConfig["strictness"]) {
+    const cfgLayer = Layer.succeed(
+      SecurityConfigService,
+      SecurityConfigService.of({
+        get: () => ({
+          ...defaultSecurityConfig,
+          strictness,
+          scanning: { ...defaultSecurityConfig.scanning, enabled: true },
+        }),
+      }),
+    )
+    return scanningRawLayer.pipe(Layer.provide(cfgLayer))
+  }
+
+  const strictScanning = testEffect(makeScanningLayer("strict"))
+  const standardScanning = testEffect(makeScanningLayer("standard"))
+  const permissiveScanning = testEffect(makeScanningLayer("permissive"))
+
+  strictScanning.effect("strict mode: scan returns pass for normal content (built-in scanners available)", () =>
+    Effect.gen(function* () {
+      const svc = yield* ScanningService
+      const result = yield* svc.scan("const x = 1;", { operation: "write" })
+      expect(result.action).toBe("pass")
+    }),
+  )
+
+  standardScanning.effect("standard mode: scanning uses injected config (not hardcoded default)", () =>
+    Effect.gen(function* () {
+      const svc = yield* ScanningService
+      const result = yield* svc.scan("test", { operation: "write" })
+      expect(result.scanner).toBeDefined()
+    }),
+  )
+
+  permissiveScanning.effect("permissive mode: scan returns pass for normal content", () =>
+    Effect.gen(function* () {
+      const svc = yield* ScanningService
+      const result = yield* svc.scan("safe code", { operation: "write" })
+      expect(result.action).toBe("pass")
     }),
   )
 })

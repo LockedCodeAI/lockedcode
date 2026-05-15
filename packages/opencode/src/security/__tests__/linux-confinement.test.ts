@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { detectPlatform, detectLinuxCapabilities, getBestBackend } from "../confinement/platform"
 import { BubblewrapBackend } from "../confinement/backends/bubblewrap"
+import { LandlockBackend } from "../confinement/backends/landlock"
 
 // ============================================================
 // Platform Detection Tests
@@ -73,5 +74,40 @@ describe("Bubblewrap backend", () => {
     // Just test the method exists and returns expected type
     const level = BubblewrapBackend.getEnforcementLevel()
     expect(["kernel", "namespace", "application"]).toContain(level)
+  })
+})
+
+// ============================================================
+// Landlock Backend Honesty Tests (#4)
+// ============================================================
+
+describe("Landlock backend", () => {
+  test("has platform linux", () => {
+    expect(LandlockBackend.platform).toBe("linux")
+  })
+
+  test("activate returns false without native syscalls", () => {
+    const result = LandlockBackend.activate("/project", ["/tmp"])
+    expect(result).toBe(false)
+  })
+
+  test("isActive returns false after activate (no real enforcement)", () => {
+    LandlockBackend.activate("/project", [])
+    expect(LandlockBackend.isActive()).toBe(false)
+  })
+
+  test("getEnforcementLevel never returns kernel without real enforcement", () => {
+    LandlockBackend.activate("/project", [])
+    expect(LandlockBackend.getEnforcementLevel()).toBe("application")
+  })
+
+  test("getEnforcementLevel returns application when inactive", () => {
+    LandlockBackend.deactivate()
+    expect(LandlockBackend.getEnforcementLevel()).toBe("application")
+  })
+
+  test("wrapCommand delegates to Bubblewrap", () => {
+    const cmd = LandlockBackend.wrapCommand("echo hi", "/project", ["/tmp"])
+    expect(cmd).toContain("bwrap")
   })
 })

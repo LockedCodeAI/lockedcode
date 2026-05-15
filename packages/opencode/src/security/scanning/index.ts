@@ -1,7 +1,6 @@
 import { Context, Effect, Layer } from "effect"
 import * as Log from "@opencode-ai/core/util/log"
 import type { ScanFinding, ScanMetadata, ScanResult, Severity, ScanningConfig, SecurityStrictness } from "../types"
-import { Service as SecurityConfigService } from "../config"
 import type { Scanner } from "./scanner"
 import { SemgrepScanner } from "./semgrep"
 import { YaraScanner } from "./yara"
@@ -10,6 +9,7 @@ import { SecretScanner } from "../secrets"
 import { InjectionScanner } from "../injection"
 import { CustomScanner } from "../rules/custom-scanner"
 import { LicenseScanner } from "../license"
+import { Service as SecurityConfigService, defaultLayer as SecurityConfigLayer } from "../config"
 
 const log = Log.create({ service: "scanning" })
 
@@ -52,46 +52,47 @@ export const layer = Layer.effect(
     const configSvc = yield* SecurityConfigService
     const securityConfig = configSvc.get()
     const cfg: ScanningConfig = securityConfig.scanning
-    const scanners: Scanner[] = []
+    const strictness: SecurityStrictness = securityConfig.strictness
 
-    // Register Semgrep scanner
+    const builtinScanners: Scanner[] = []
+    const externalScanners: Scanner[] = []
+
+    // External scanners (require installed binaries)
     if (cfg.semgrep.enabled) {
       const semgrep = yield* SemgrepScanner(cfg.semgrep)
-      scanners.push(semgrep)
+      externalScanners.push(semgrep)
     }
-
-    // Register YARA scanner
     if (cfg.yara.enabled) {
       const yara = yield* YaraScanner(cfg.yara)
-      scanners.push(yara)
+      externalScanners.push(yara)
     }
 
-    // Register Entropy scanner
+    // Built-in scanners (pure TypeScript, always available)
     if (cfg.entropy.enabled) {
       const entropy = yield* EntropyScanner(cfg.entropy)
-      scanners.push(entropy)
+      builtinScanners.push(entropy)
     }
-
-    // Register Secret scanner
     const secrets = yield* SecretScanner()
-    scanners.push(secrets)
-
-    // Register Injection scanner
+    builtinScanners.push(secrets)
     const injection = yield* InjectionScanner(securityConfig.injection)
-    scanners.push(injection)
-
-    // Register Custom scanner
+    builtinScanners.push(injection)
     const custom = yield* CustomScanner()
-    scanners.push(custom)
-
-    // Register License scanner
+    builtinScanners.push(custom)
     const license = yield* LicenseScanner()
-    scanners.push(license)
+    builtinScanners.push(license)
+
+    const allScanners: Scanner[] = [...builtinScanners, ...externalScanners]
+
+    log.info("scanning initialized", {
+      builtinScanners: builtinScanners.length,
+      externalScanners: externalScanners.length,
+      strictness,
+    })
 
     let noScannerWarning = false
 
     const registerScanner = Effect.fn("Scanning.registerScanner")(function* (scanner: Scanner) {
-      scanners.push(scanner)
+      allScanners.push(scanner)
       log.info("scanner registered", { name: scanner.name })
     })
 
@@ -108,23 +109,22 @@ export const layer = Layer.effect(
         } as ScanResult
       }
 
-      // Check which scanners are available
       const available: Scanner[] = []
-      for (const scanner of scanners) {
+      for (const scanner of allScanners) {
         const avail = yield* scanner.isAvailable()
         if (avail) available.push(scanner)
       }
 
       if (available.length === 0) {
         if (!noScannerWarning) {
-          log.warn("No scanners available — install semgrep or yara for static analysis")
+          log.error("no scanners available — content will not be inspected", { strictness })
           noScannerWarning = true
         }
-        const strictness = securityConfig.strictness
-        const failAction = strictness === "strict" ? "block" as const
-          : strictness === "standard" ? "warn" as const
-          : "pass" as const
-        const failSeverity: Severity = failAction === "block" ? "high" : failAction === "warn" ? "warning" : "info"
+        const failAction: "pass" | "warn" | "block" =
+          strictness === "strict" ? "block" :
+          strictness === "standard" ? "warn" :
+          "pass"
+        const failSeverity: Severity = strictness === "permissive" ? "info" : "warning"
         return {
           severity: failSeverity,
           action: failAction,
@@ -138,7 +138,6 @@ export const layer = Layer.effect(
 
       log.debug("scanning content", { scanners: available.map((s) => s.name), contentLength: content.length })
 
-      // Run all available scanners in parallel
       const findingArrays = yield* Effect.forEach(
         available,
         (scanner) =>
@@ -153,7 +152,7 @@ export const layer = Layer.effect(
 
       const findings: ScanFinding[] = (findingArrays as ScanFinding[][]).flat()
       const sev = highestSeverity(findings)
-      const action = aggregateAction(sev, securityConfig.strictness)
+      const action = aggregateAction(sev, strictness)
 
       if (findings.length > 0) {
         log.info("scan complete", {
@@ -178,7 +177,5 @@ export const layer = Layer.effect(
     return Service.of({ registerScanner, scan })
   }),
 )
-
-import { defaultLayer as SecurityConfigLayer } from "../config"
 
 export const defaultLayer = layer.pipe(Layer.provide(SecurityConfigLayer))
