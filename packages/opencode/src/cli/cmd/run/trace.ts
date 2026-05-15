@@ -14,6 +14,7 @@
 import fs from "fs"
 import path from "path"
 import { Global } from "@opencode-ai/core/global"
+import { checkPathSync } from "../../../security/confinement/whitelist"
 
 export type Trace = {
   write(type: string, data?: unknown): void
@@ -61,7 +62,13 @@ export function trace(): Trace | undefined {
   }
 
   const target = file()
-  fs.mkdirSync(path.dirname(target), { recursive: true })
+  const logDir = path.dirname(target)
+  const dirCheck = checkPathSync(logDir, "write", process.cwd())
+  if (!dirCheck.allowed) {
+    state = false
+    return undefined
+  }
+  fs.mkdirSync(logDir, { recursive: true })
   fs.writeFileSync(
     latest(),
     text({

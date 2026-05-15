@@ -1,7 +1,7 @@
 import fs from "fs"
 import path from "path"
-import os from "os"
 import * as Log from "@opencode-ai/core/util/log"
+import { checkPathSync } from "../confinement/whitelist"
 
 const log = Log.create({ service: "rules.resolver" })
 
@@ -36,8 +36,7 @@ export function resolveRulesPath(ruleType: RuleType, customPath?: string, projec
   const cwd = projectRoot ?? process.cwd()
   candidates.push(path.join(cwd, "rules", ruleType))
 
-  // 3. User home
-  candidates.push(path.join(os.homedir(), ".lockedcode", "rules", ruleType))
+  // 3. User home — skipped, global rules not supported (see loader.ts allowGlobalRules guard)
 
   // 4. Repo-relative (development) — walk up looking for rules/ dir
   let current = path.resolve(cwd)
@@ -54,6 +53,11 @@ export function resolveRulesPath(ruleType: RuleType, customPath?: string, projec
 
   for (const dir of candidates) {
     try {
+      const result = checkPathSync(dir, "read", cwd)
+      if (!result.allowed) {
+        log.debug("confinement denied rules path", { dir, reason: result.reason })
+        continue
+      }
       if (fs.existsSync(dir) && fs.statSync(dir).isDirectory()) {
         const files = fs.readdirSync(dir)
         if (files.length > 0) {

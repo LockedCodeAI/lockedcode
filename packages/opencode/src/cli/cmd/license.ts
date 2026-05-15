@@ -1,8 +1,10 @@
 import type { CommandModule } from "yargs"
 import fs from "fs"
+import path from "path"
 import { fingerprint, similarity } from "../../security/license/fingerprint"
 import { loadSignatures } from "../../security/license/signatures"
 import { classifyLicense } from "../../security/license/classify"
+import { checkPathSync } from "../../security/confinement/whitelist"
 
 type ScanArgs = { file: string; threshold?: number }
 type ReportArgs = { since?: string }
@@ -20,6 +22,13 @@ export const LicenseScanCommand = {
 
     if (!fs.existsSync(filepath)) {
       console.error(`File not found: ${filepath}`)
+      process.exit(1)
+    }
+
+    const resolved = path.resolve(filepath)
+    const readCheck = checkPathSync(resolved, "read", process.cwd())
+    if (!readCheck.allowed) {
+      console.error(`Confinement: cannot read ${resolved} — ${readCheck.reason}`)
       process.exit(1)
     }
 

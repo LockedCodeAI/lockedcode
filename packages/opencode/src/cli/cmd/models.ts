@@ -8,6 +8,10 @@ import { checkPathSync } from "../../security/confinement/whitelist"
 
 const log = Log.create({ service: "cli.models" })
 
+function escapeSql(value: string): string {
+  return value.replace(/'/g, "''")
+}
+
 type ListArgs = {}
 type ApproveArgs = { modelId: string; reason?: string }
 type BlockArgs = { modelId: string; reason?: string }
@@ -67,8 +71,8 @@ export const ModelsListCommand = {
     let approved = 0, blocked = 0, unknown = 0, pending = 0
 
     for (const m of models) {
-      const trust = query(`SELECT * FROM model_trust WHERE model_id = '${m.model_id}'`)[0]
-      const provenance = query(`SELECT COUNT(*) as total, file_path FROM file_provenance WHERE model_id = '${m.model_id}' GROUP BY file_path`)
+      const trust = query(`SELECT * FROM model_trust WHERE model_id = '${escapeSql(m.model_id)}'`)[0]
+      const provenance = query(`SELECT COUNT(*) as total, file_path FROM file_provenance WHERE model_id = '${escapeSql(m.model_id)}' GROUP BY file_path`)
 
       const flagRate = trust ? ((trust.flagged_actions / Math.max(trust.total_actions, 1)) * 100).toFixed(1) : "?"
       const files = provenance ? provenance.length : "?"
@@ -103,8 +107,8 @@ export const ModelsApproveCommand = {
     const reason = args.reason as string | undefined
 
     run(`INSERT INTO model_registry (model_id, status, added_by, reason, first_seen, last_seen, session_count, time_created, time_updated)
-      VALUES ('${modelId}', 'approved', 'cli', ${reason ? `'${reason}'` : "NULL"}, ${Date.now()}, ${Date.now()}, 0, ${Date.now()}, ${Date.now()})
-      ON CONFLICT(model_id) DO UPDATE SET status = 'approved', added_by = 'cli', reason = ${reason ? `'${reason}'` : "NULL"}, time_updated = ${Date.now()}`)
+      VALUES ('${escapeSql(modelId)}', 'approved', 'cli', ${reason ? `'${escapeSql(reason)}'` : "NULL"}, ${Date.now()}, ${Date.now()}, 0, ${Date.now()}, ${Date.now()})
+      ON CONFLICT(model_id) DO UPDATE SET status = 'approved', added_by = 'cli', reason = ${reason ? `'${escapeSql(reason)}'` : "NULL"}, time_updated = ${Date.now()}`)
 
     console.log(`\n✓ Model "${modelId}" approved.${reason ? ` Reason: ${reason}` : ""}\n`)
   },
@@ -122,8 +126,8 @@ export const ModelsBlockCommand = {
     const reason = args.reason as string | undefined
 
     run(`INSERT INTO model_registry (model_id, status, added_by, reason, first_seen, last_seen, session_count, time_created, time_updated)
-      VALUES ('${modelId}', 'blocked', 'cli', ${reason ? `'${reason}'` : "NULL"}, ${Date.now()}, ${Date.now()}, 0, ${Date.now()}, ${Date.now()})
-      ON CONFLICT(model_id) DO UPDATE SET status = 'blocked', added_by = 'cli', reason = ${reason ? `'${reason}'` : "NULL"}, time_updated = ${Date.now()}`)
+      VALUES ('${escapeSql(modelId)}', 'blocked', 'cli', ${reason ? `'${escapeSql(reason)}'` : "NULL"}, ${Date.now()}, ${Date.now()}, 0, ${Date.now()}, ${Date.now()})
+      ON CONFLICT(model_id) DO UPDATE SET status = 'blocked', added_by = 'cli', reason = ${reason ? `'${escapeSql(reason)}'` : "NULL"}, time_updated = ${Date.now()}`)
 
     console.log(`\n✗ Model "${modelId}" blocked.${reason ? ` Reason: ${reason}` : ""}\n`)
   },
@@ -138,14 +142,15 @@ export const ModelsReportCommand = {
     const modelId = args.modelId as string | undefined
 
     if (modelId) {
-      const m = query(`SELECT * FROM model_registry WHERE model_id = '${modelId}'`)[0]
+      const safeId = escapeSql(modelId)
+      const m = query(`SELECT * FROM model_registry WHERE model_id = '${safeId}'`)[0]
       if (!m) {
         console.log(`\nModel "${modelId}" not found in registry.\n`)
         return
       }
-      const trust = query(`SELECT * FROM model_trust WHERE model_id = '${modelId}'`)[0]
-      const provenance = query(`SELECT operation, COUNT(*) as cnt FROM file_provenance WHERE model_id = '${modelId}' GROUP BY operation`)
-      const files = query(`SELECT COUNT(DISTINCT file_path) as cnt FROM file_provenance WHERE model_id = '${modelId}'`)[0]
+      const trust = query(`SELECT * FROM model_trust WHERE model_id = '${safeId}'`)[0]
+      const provenance = query(`SELECT operation, COUNT(*) as cnt FROM file_provenance WHERE model_id = '${safeId}' GROUP BY operation`)
+      const files = query(`SELECT COUNT(DISTINCT file_path) as cnt FROM file_provenance WHERE model_id = '${safeId}'`)[0]
 
       console.log(`\nModel Report: ${modelId}`)
       console.log("═".repeat(Math.min(55, modelId.length + 16)))

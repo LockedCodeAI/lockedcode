@@ -109,6 +109,12 @@ export const SIEMExportCommand = {
     const result = fmt === "ocsf" ? `[\n${formatted.join(",\n")}\n]` : formatted.join("\n")
 
     if (output) {
+      const resolved = path.resolve(output)
+      const writeCheck = checkPathSync(resolved, "write", process.cwd())
+      if (!writeCheck.allowed) {
+        console.error(`Confinement: cannot write to ${resolved} — ${writeCheck.reason}`)
+        process.exit(1)
+      }
       fs.writeFileSync(output, result, "utf-8")
       console.log(`Exported ${rows.length} events to ${output}`)
     } else {
