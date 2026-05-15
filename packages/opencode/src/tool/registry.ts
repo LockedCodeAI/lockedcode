@@ -388,7 +388,35 @@ export const layer: Layer.Layer<
                 details: buildDetails({ status: "pending" }),
               })
 
-              // Step 1.5: Confinement check for file-write tools
+              // Step 1.5: Confinement check for file-read tools (prevents exfiltration to LLM)
+              if ((tool.id === "read" || tool.id === "glob" || tool.id === "grep") && filePath) {
+                const confinement = yield* security.checkConfinement(filePath, "read")
+                if (!confinement.allowed) {
+                  yield* security.recordAuditEvent({
+                    eventType: "file_write_blocked",
+                    sessionId: ctx.sessionID,
+                    timestamp: now,
+                    severity: "high",
+                    toolName: tool.id,
+                    modelId: ctx.agent,
+                    contentHash: contentForHash,
+                    actionTaken: "blocked",
+                    details: buildDetails({
+                      status: "blocked",
+                      block_reason: `Confinement: ${confinement.reason}`,
+                      path: confinement.path,
+                      escapable: confinement.escapable,
+                    }),
+                  })
+                  return {
+                    title: `⛔ SECURITY BLOCKED (Confinement): read path outside project root`,
+                    output: `Blocked by directory confinement: ${confinement.reason}\nPath: ${confinement.path}`,
+                    metadata: {},
+                  } as Tool.ExecuteResult
+                }
+              }
+
+              // Step 1.6: Confinement check for file-write tools
               if ((tool.id === "write" || tool.id === "edit" || tool.id === "patch") && filePath) {
                 const confinement = yield* security.checkConfinement(filePath, "write")
                 if (!confinement.allowed) {

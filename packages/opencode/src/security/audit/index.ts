@@ -48,7 +48,8 @@ export interface Interface {
   }) => Effect.Effect<void>
   readonly query: (filters: AuditFilter) => Effect.Effect<SecurityEvent[]>
   readonly getSessionSummary: (sessionId: string) => Effect.Effect<SessionSummary>
-  readonly prune: () => Effect.Effect<number>
+  readonly prune: (retentionDays?: number) => Effect.Effect<number>
+  readonly pruneAll: (confirm: "DELETE_ALL_AUDIT_DATA") => Effect.Effect<number>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@lockedcode/Audit") {}
@@ -264,18 +265,42 @@ export const layer = Layer.effect(
       } as SessionSummary
     })
 
-    const prune = Effect.fn("Audit.prune")(function* () {
+    const prune = Effect.fn("Audit.prune")(function* (retentionDays?: number) {
+      const days = retentionDays ?? 90
+      const cutoff = Date.now() - days * 24 * 60 * 60 * 1000
+      const where = lte(SecurityEventTable.timestamp, cutoff)
+
+      yield* Effect.sync(() => db.delete(ScanResultTable).where(
+        inArray(ScanResultTable.security_event_id,
+          db.select({ id: SecurityEventTable.id }).from(SecurityEventTable).where(where)
+        )
+      ).run())
+      yield* Effect.sync(() => db.delete(PolicyDecisionTable).where(
+        inArray(PolicyDecisionTable.security_event_id,
+          db.select({ id: SecurityEventTable.id }).from(SecurityEventTable).where(where)
+        )
+      ).run())
+      const result: any = yield* Effect.sync(() =>
+        db.delete(SecurityEventTable).where(where).run(),
+      )
+      const count = result?.changes ?? 0
+      if (count > 0) log.info("pruned audit events", { count, retentionDays: days })
+      return count
+    })
+
+    const pruneAll = Effect.fn("Audit.pruneAll")(function* (confirm: "DELETE_ALL_AUDIT_DATA") {
+      if (confirm !== "DELETE_ALL_AUDIT_DATA") return 0
       yield* Effect.sync(() => db.delete(ScanResultTable).run())
       yield* Effect.sync(() => db.delete(PolicyDecisionTable).run())
       const result: any = yield* Effect.sync(() =>
         db.delete(SecurityEventTable).run(),
       )
       const count = result?.changes ?? 0
-      if (count > 0) log.info("pruned audit events", { count })
+      if (count > 0) log.info("pruned ALL audit data", { count })
       return count
     })
 
-    return Service.of({ record, recordScanResult, recordPolicyDecision, query, getSessionSummary, prune })
+    return Service.of({ record, recordScanResult, recordPolicyDecision, query, getSessionSummary, prune, pruneAll })
   }),
 )
 

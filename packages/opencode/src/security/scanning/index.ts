@@ -1,7 +1,7 @@
 import { Context, Effect, Layer } from "effect"
 import * as Log from "@opencode-ai/core/util/log"
 import type { ScanFinding, ScanMetadata, ScanResult, Severity, ScanningConfig, SecurityStrictness } from "../types"
-import { defaultSecurityConfig } from "../types"
+import { Service as SecurityConfigService } from "../config"
 import type { Scanner } from "./scanner"
 import { SemgrepScanner } from "./semgrep"
 import { YaraScanner } from "./yara"
@@ -49,7 +49,9 @@ function aggregateAction(severity: Severity, strictness: SecurityStrictness): "p
 export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
-    const cfg: ScanningConfig = defaultSecurityConfig.scanning
+    const configSvc = yield* SecurityConfigService
+    const securityConfig = configSvc.get()
+    const cfg: ScanningConfig = securityConfig.scanning
     const scanners: Scanner[] = []
 
     // Register Semgrep scanner
@@ -75,7 +77,7 @@ export const layer = Layer.effect(
     scanners.push(secrets)
 
     // Register Injection scanner
-    const injection = yield* InjectionScanner(defaultSecurityConfig.injection)
+    const injection = yield* InjectionScanner(securityConfig.injection)
     scanners.push(injection)
 
     // Register Custom scanner
@@ -118,9 +120,14 @@ export const layer = Layer.effect(
           log.warn("No scanners available — install semgrep or yara for static analysis")
           noScannerWarning = true
         }
+        const strictness = securityConfig.strictness
+        const failAction = strictness === "strict" ? "block" as const
+          : strictness === "standard" ? "warn" as const
+          : "pass" as const
+        const failSeverity: Severity = failAction === "block" ? "high" : failAction === "warn" ? "warning" : "info"
         return {
-          severity: "info" as Severity,
-          action: "pass" as const,
+          severity: failSeverity,
+          action: failAction,
           findings: [],
           ruleId: "no-scanner",
           matchedContent: "",
@@ -146,7 +153,7 @@ export const layer = Layer.effect(
 
       const findings: ScanFinding[] = (findingArrays as ScanFinding[][]).flat()
       const sev = highestSeverity(findings)
-      const action = aggregateAction(sev, defaultSecurityConfig.strictness)
+      const action = aggregateAction(sev, securityConfig.strictness)
 
       if (findings.length > 0) {
         log.info("scan complete", {
@@ -172,4 +179,6 @@ export const layer = Layer.effect(
   }),
 )
 
-export const defaultLayer = layer
+import { defaultLayer as SecurityConfigLayer } from "../config"
+
+export const defaultLayer = layer.pipe(Layer.provide(SecurityConfigLayer))
