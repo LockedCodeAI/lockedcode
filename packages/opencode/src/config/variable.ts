@@ -4,6 +4,10 @@ import path from "path"
 import os from "os"
 import { Filesystem } from "@/util/filesystem"
 import { InvalidError } from "./error"
+import * as Log from "@opencode-ai/core/util/log"
+import { checkPathSync } from "../security/confinement/whitelist"
+
+const log = Log.create({ service: "config.variable" })
 
 type ParseSource =
   | {
@@ -63,6 +67,21 @@ export async function substitute(input: SubstituteInput) {
     }
 
     const resolvedPath = path.isAbsolute(filePath) ? filePath : path.resolve(configDir, filePath)
+
+    const confinementRoot = configDir || process.cwd()
+    const confinement = checkPathSync(resolvedPath, "read", confinementRoot)
+    if (!confinement.allowed) {
+      log.error("confinement denied config file reference", {
+        token,
+        resolvedPath,
+        reason: confinement.reason,
+      })
+      throw new InvalidError({
+        path: configSource,
+        message: `confinement denied: "${token}" resolves to ${resolvedPath} which is outside the project root`,
+      })
+    }
+
     const fileContent = (
       await Filesystem.readText(resolvedPath).catch((error: NodeJS.ErrnoException) => {
         if (missing === "empty") return ""

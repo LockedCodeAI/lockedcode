@@ -6,6 +6,15 @@ import { detectProjectRoot } from "./root"
 import { canonicalize, isSubPath } from "./paths"
 import { Identifier } from "@/id/id"
 import { Service as SecurityConfigService, defaultLayer as SecurityConfigLayer } from "../config"
+import { isExternalPathWhitelisted } from "./whitelist"
+
+export {
+  registerExternalPath,
+  isExternalPathWhitelisted,
+  clearExternalPathWhitelist,
+  getExternalPaths,
+  checkPathSync,
+} from "./whitelist"
 
 const log = Log.create({ service: "confinement" })
 
@@ -84,6 +93,13 @@ export const layer = Layer.effect(
           log.info("pre-approved path access", { path: canon, approved })
           return { allowed: true, path: canon, operation, reason: `pre-approved path: ${approved}`, escapable: false } as ConfinementResult
         }
+      }
+
+      // Check external path whitelist (registered via registerExternalPath)
+      const whitelistReason = isExternalPathWhitelisted(canon)
+      if (whitelistReason) {
+        log.debug("whitelisted external path access", { path: canon, operation, reason: whitelistReason })
+        return { allowed: true, path: canon, operation, reason: `whitelisted external path: ${whitelistReason}`, escapable: false } as ConfinementResult
       }
 
       // Denied — but escapable
