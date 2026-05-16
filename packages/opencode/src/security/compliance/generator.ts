@@ -37,13 +37,14 @@ export interface ComplianceReport {
   }
 }
 
+import { checkPathSync } from "../confinement/whitelist"
+import os from "os"
+import path from "path"
+import fs from "fs"
+import { execFileSync } from "child_process"
+
 function query(sql: string): any[] {
   try {
-    const os = require("os")
-    const path = require("path")
-    const fs = require("fs")
-    const { execFileSync } = require("child_process")
-    const { checkPathSync } = require("../confinement/whitelist")
     const dbPath = path.join(os.homedir(), ".local", "share", "lockedcode", "lockedcode-local.db")
     const check = checkPathSync(dbPath, "read", process.cwd())
     if (!check.allowed) return []
