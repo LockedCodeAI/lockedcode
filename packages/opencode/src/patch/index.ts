@@ -4,6 +4,7 @@ import * as fs from "fs/promises"
 import { readFileSync } from "fs"
 import * as Log from "@opencode-ai/core/util/log"
 import * as Bom from "../util/bom"
+import { checkPathSync } from "../security/confinement/whitelist"
 
 const log = Log.create({ service: "patch" })
 
@@ -517,6 +518,13 @@ function generateUnifiedDiff(oldContent: string, newContent: string): string {
   return hasChanges ? diff : ""
 }
 
+function assertConfinedWrite(filePath: string): void {
+  const result = checkPathSync(filePath, "write", process.cwd())
+  if (!result.allowed) {
+    throw new Error(`Confinement: write denied to ${filePath} — ${result.reason}`)
+  }
+}
+
 // Apply hunks to filesystem
 export async function applyHunksToFiles(hunks: Hunk[]): Promise<AffectedPaths> {
   if (hunks.length === 0) {
@@ -530,7 +538,7 @@ export async function applyHunksToFiles(hunks: Hunk[]): Promise<AffectedPaths> {
   for (const hunk of hunks) {
     switch (hunk.type) {
       case "add":
-        // Create parent directories
+        assertConfinedWrite(hunk.path)
         const addDir = path.dirname(hunk.path)
         if (addDir !== "." && addDir !== "/") {
           await fs.mkdir(addDir, { recursive: true })
@@ -542,16 +550,18 @@ export async function applyHunksToFiles(hunks: Hunk[]): Promise<AffectedPaths> {
         break
 
       case "delete":
+        assertConfinedWrite(hunk.path)
         await fs.unlink(hunk.path)
         deleted.push(hunk.path)
         log.info(`Deleted file: ${hunk.path}`)
         break
 
       case "update":
+        assertConfinedWrite(hunk.path)
         const fileUpdate = deriveNewContentsFromChunks(hunk.path, hunk.chunks)
 
         if (hunk.move_path) {
-          // Handle file move
+          assertConfinedWrite(hunk.move_path)
           const moveDir = path.dirname(hunk.move_path)
           if (moveDir !== "." && moveDir !== "/") {
             await fs.mkdir(moveDir, { recursive: true })
@@ -562,7 +572,6 @@ export async function applyHunksToFiles(hunks: Hunk[]): Promise<AffectedPaths> {
           modified.push(hunk.move_path)
           log.info(`Moved file: ${hunk.path} -> ${hunk.move_path}`)
         } else {
-          // Regular update
           await fs.writeFile(hunk.path, Bom.join(fileUpdate.content, fileUpdate.bom), "utf-8")
           modified.push(hunk.path)
           log.info(`Updated file: ${hunk.path}`)

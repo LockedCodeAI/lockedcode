@@ -7,6 +7,7 @@ import { execFileSync } from "child_process"
 import type { ScanFinding, ScanMetadata, Severity } from "../types"
 import type { Scanner } from "./scanner"
 import { resolveRulesPath } from "../rules/resolver"
+import { checkPathSync } from "../confinement/whitelist"
 
 const log = Log.create({ service: "scanning.yara" })
 
@@ -145,9 +146,14 @@ function parseYaraOutput(stdout: string, rulesDir: string): ScanFinding[] {
       currentMeta = {}
 
       // Try to parse rule from bundled file for metadata
+      const rulesDirCheck = checkPathSync(rulesDir, "read", process.cwd())
+      if (!rulesDirCheck.allowed) continue
       const rulesFiles = fs.readdirSync(rulesDir).filter((f) => f.endsWith(".yar") || f.endsWith(".yara"))
       for (const rf of rulesFiles) {
-        const content = fs.readFileSync(path.join(rulesDir, rf), "utf-8")
+        const rfPath = path.join(rulesDir, rf)
+        const rfCheck = checkPathSync(rfPath, "read", process.cwd())
+        if (!rfCheck.allowed) continue
+        const content = fs.readFileSync(rfPath, "utf-8")
         const metaMatch = content.match(new RegExp(`rule\\s+${escapeRegex(currentRule)}\\s*\\{[^}]*meta:\\s*([^}]+)`, "s"))
         if (metaMatch) {
           const metaBlock = metaMatch[1]
