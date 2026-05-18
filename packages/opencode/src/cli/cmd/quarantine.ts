@@ -8,7 +8,10 @@ import { checkPathSync } from "../../security/confinement/whitelist"
 
 const log = Log.create({ service: "cli.quarantine" })
 
-function escapeSql(value: string): string {
+function safeSqlString(value: string): string {
+  if (value.includes("\0")) {
+    throw new Error("Invalid input: null bytes are not allowed")
+  }
   return value.replace(/'/g, "''")
 }
 
@@ -62,8 +65,8 @@ export const QuarantineListCommand = {
 
     let sql = "SELECT * FROM quarantine_record"
     const clauses: string[] = []
-    if (status) clauses.push(`status = '${escapeSql(status)}'`)
-    if (severity) clauses.push(`severity = '${escapeSql(severity)}'`)
+    if (status) clauses.push(`status = '${safeSqlString(status)}'`)
+    if (severity) clauses.push(`severity = '${safeSqlString(severity)}'`)
     if (clauses.length > 0) sql += ` WHERE ${clauses.join(" AND ")}`
     sql += " ORDER BY quarantined_at DESC LIMIT 50"
 
@@ -105,7 +108,7 @@ export const QuarantineShowCommand = {
   builder: (yargs: any) => yargs.positional("id", { describe: "Quarantine record ID", type: "string" }),
   handler: async (args: any) => {
     const id = args.id as string
-    const rows = query(`SELECT * FROM quarantine_record WHERE id = '${escapeSql(id)}'`)
+    const rows = query(`SELECT * FROM quarantine_record WHERE id = '${safeSqlString(id)}'`)
 
     if (rows.length === 0) {
       console.log(`\nQuarantine record "${id}" not found.\n`)
@@ -147,7 +150,7 @@ export const QuarantineRestoreCommand = {
   builder: (yargs: any) => yargs.positional("id", { describe: "Quarantine record ID", type: "string" }),
   handler: async (args: any) => {
     const id = args.id as string
-    const safeId = escapeSql(id)
+    const safeId = safeSqlString(id)
     const rows = query(`SELECT * FROM quarantine_record WHERE id = '${safeId}'`)
 
     if (rows.length === 0) {
@@ -174,7 +177,7 @@ export const QuarantineDiscardCommand = {
   builder: (yargs: any) => yargs.positional("id", { describe: "Quarantine record ID", type: "string" }),
   handler: async (args: any) => {
     const id = args.id as string
-    run(`UPDATE quarantine_record SET status = 'discarded', resolved_at = ${Date.now()}, resolved_by = 'user' WHERE id = '${escapeSql(id)}'`)
+    run(`UPDATE quarantine_record SET status = 'discarded', resolved_at = ${Date.now()}, resolved_by = 'user' WHERE id = '${safeSqlString(id)}'`)
 
     console.log(`\n✗ Discarded ${id} (quarantined content retained in database for audit)\n`)
   },

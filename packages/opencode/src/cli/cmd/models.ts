@@ -8,8 +8,18 @@ import { checkPathSync } from "../../security/confinement/whitelist"
 
 const log = Log.create({ service: "cli.models" })
 
-function escapeSql(value: string): string {
+function safeSqlString(value: string): string {
+  if (value.includes("\0")) {
+    throw new Error("Invalid input: null bytes are not allowed")
+  }
   return value.replace(/'/g, "''")
+}
+
+function safeSqlModelId(value: string): string {
+  if (!/^[\w.:\-/]+$/.test(value)) {
+    throw new Error(`Invalid model ID: only alphanumeric, dots, colons, hyphens, underscores, and slashes are allowed`)
+  }
+  return safeSqlString(value)
 }
 
 type ListArgs = {}
@@ -71,8 +81,8 @@ export const ModelsListCommand = {
     let approved = 0, blocked = 0, unknown = 0, pending = 0
 
     for (const m of models) {
-      const trust = query(`SELECT * FROM model_trust WHERE model_id = '${escapeSql(m.model_id)}'`)[0]
-      const provenance = query(`SELECT COUNT(*) as total, file_path FROM file_provenance WHERE model_id = '${escapeSql(m.model_id)}' GROUP BY file_path`)
+      const trust = query(`SELECT * FROM model_trust WHERE model_id = '${safeSqlModelId(m.model_id)}'`)[0]
+      const provenance = query(`SELECT COUNT(*) as total, file_path FROM file_provenance WHERE model_id = '${safeSqlModelId(m.model_id)}' GROUP BY file_path`)
 
       const flagRate = trust ? ((trust.flagged_actions / Math.max(trust.total_actions, 1)) * 100).toFixed(1) : "?"
       const files = provenance ? provenance.length : "?"
@@ -107,8 +117,8 @@ export const ModelsApproveCommand = {
     const reason = args.reason as string | undefined
 
     run(`INSERT INTO model_registry (model_id, status, added_by, reason, first_seen, last_seen, session_count, time_created, time_updated)
-      VALUES ('${escapeSql(modelId)}', 'approved', 'cli', ${reason ? `'${escapeSql(reason)}'` : "NULL"}, ${Date.now()}, ${Date.now()}, 0, ${Date.now()}, ${Date.now()})
-      ON CONFLICT(model_id) DO UPDATE SET status = 'approved', added_by = 'cli', reason = ${reason ? `'${escapeSql(reason)}'` : "NULL"}, time_updated = ${Date.now()}`)
+      VALUES ('${safeSqlModelId(modelId)}', 'approved', 'cli', ${reason ? `'${safeSqlString(reason)}'` : "NULL"}, ${Date.now()}, ${Date.now()}, 0, ${Date.now()}, ${Date.now()})
+      ON CONFLICT(model_id) DO UPDATE SET status = 'approved', added_by = 'cli', reason = ${reason ? `'${safeSqlString(reason)}'` : "NULL"}, time_updated = ${Date.now()}`)
 
     console.log(`\n✓ Model "${modelId}" approved.${reason ? ` Reason: ${reason}` : ""}\n`)
   },
@@ -126,8 +136,8 @@ export const ModelsBlockCommand = {
     const reason = args.reason as string | undefined
 
     run(`INSERT INTO model_registry (model_id, status, added_by, reason, first_seen, last_seen, session_count, time_created, time_updated)
-      VALUES ('${escapeSql(modelId)}', 'blocked', 'cli', ${reason ? `'${escapeSql(reason)}'` : "NULL"}, ${Date.now()}, ${Date.now()}, 0, ${Date.now()}, ${Date.now()})
-      ON CONFLICT(model_id) DO UPDATE SET status = 'blocked', added_by = 'cli', reason = ${reason ? `'${escapeSql(reason)}'` : "NULL"}, time_updated = ${Date.now()}`)
+      VALUES ('${safeSqlModelId(modelId)}', 'blocked', 'cli', ${reason ? `'${safeSqlString(reason)}'` : "NULL"}, ${Date.now()}, ${Date.now()}, 0, ${Date.now()}, ${Date.now()})
+      ON CONFLICT(model_id) DO UPDATE SET status = 'blocked', added_by = 'cli', reason = ${reason ? `'${safeSqlString(reason)}'` : "NULL"}, time_updated = ${Date.now()}`)
 
     console.log(`\n✗ Model "${modelId}" blocked.${reason ? ` Reason: ${reason}` : ""}\n`)
   },
@@ -142,7 +152,7 @@ export const ModelsReportCommand = {
     const modelId = args.modelId as string | undefined
 
     if (modelId) {
-      const safeId = escapeSql(modelId)
+      const safeId = safeSqlModelId(modelId)
       const m = query(`SELECT * FROM model_registry WHERE model_id = '${safeId}'`)[0]
       if (!m) {
         console.log(`\nModel "${modelId}" not found in registry.\n`)
